@@ -1,4 +1,4 @@
-add_executable(unit_tests SocketInterfaces.cpp)
+add_executable(unit_tests NetworkListener.cpp)
 
 
 target_link_libraries(unit_tests

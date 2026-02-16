@@ -16,7 +16,7 @@
 #include "AddressInfo.h"
 #include "types.h"
 
-class SocketInterfaces {
+class NetworkListener {
 
 private:
     std::vector<AddressInfo> m_interfaces {};
@@ -65,7 +65,7 @@ public:
     }
 
 
-    void getRemoteInterfaces(const std::string& hostname,const std::string& port, const Int& ipVersion = 0, const Int& socketType = 0) {
+    void fetchInterfacesToConnect(const std::string& hostname,const std::string& port, const Int& ipVersion = 0, const Int& socketType = 0) {
 
         addrinfo hints {};
         hints.ai_family = ipVersion;
@@ -79,7 +79,7 @@ public:
         loadInterfaces(result);
     };
 
-    void getLocalInterfaces( const std::string& port, const Int& ipVersion = 0, const Int& socketType = 0) {
+    void fetchInterfacesToBind( const std::string& port, const Int& ipVersion = 0, const Int& socketType = 0) {
 
         addrinfo hints {};
         hints.ai_flags = AI_PASSIVE;

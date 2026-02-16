@@ -15,7 +15,7 @@ add_executable(socks_dev
         src/main.cpp
         include/socks/AddressInfo.h
         include/socks/types.h
-        include/socks/SocketInterfaces.h
+        include/socks/NetworkListener.h
 )
 
 target_link_libraries(socks_dev PRIVATE socks)
