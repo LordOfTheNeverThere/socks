@@ -71,8 +71,9 @@ public:
         hints.ai_family = ipVersion;
         hints.ai_socktype = socketType;
         addrinfo *result = nullptr;
+        const Int status = getaddrinfo(hostname.c_str(), port.c_str(), &hints, &result);
 
-        if (const Int status = getaddrinfo(hostname.c_str(), port.c_str(), &hints, &result) != 0 || result == nullptr) { // Resolve localhost's name and return available interfaces
+        if ( status != 0 || result == nullptr) {
             std::string error {"The name resolution was not able to find any viable interfaces for the socket connection to " + hostname + " on port: " + port + " and IP version: " + std::to_string(ipVersion) + ".\n" + "Prompting the error with status code: " + gai_strerror(status)};
             throw error;
         }
@@ -86,8 +87,9 @@ public:
         hints.ai_family = ipVersion;
         hints.ai_socktype = socketType;
         addrinfo *result = nullptr;
+        const Int status = getaddrinfo(nullptr, port.c_str(), &hints, &result);
 
-        if (const Int status = getaddrinfo(nullptr, port.c_str(), &hints, &result) != 0 || result == nullptr) { // Resolve localhost's name and return available interfaces
+        if ( status != 0 || result == nullptr) { // Resolve localhost's name and return available interfaces
             std::string error {"The name resolution was not able to find any viable interfaces for the socket connection to localhost on port: " + port + " and IP version: " + std::to_string(ipVersion) + ".\n" + "Prompting the error with status code: " + gai_strerror(status)};
             throw error;
         }

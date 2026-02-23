@@ -5,7 +5,7 @@
 
 TEST(MethodChecking, LocalhostResponse) {
     NetworkListener socket;
-    socket.fetchInterfacesToBind("8080", 0, SOCK_RAW);
+    socket.fetchInterfacesToBind("8080", 0, 0);
 
     for (const auto& interface: socket.getInterfaces()) {
         EXPECT_EQ(interface.port, 8080);
@@ -19,7 +19,7 @@ TEST(MethodChecking, LocalhostResponse) {
 TEST(MethodChecking, RemoteHostResponse) {
 
     NetworkListener socket;
-    socket.fetchInterfacesToConnect("localhost","65000", AF_INET6, SOCK_RAW);
+    socket.fetchInterfacesToConnect("localhost","65000", AF_INET6, 0);
 
     for (const auto& interface: socket.getInterfaces()) {
         EXPECT_EQ(interface.port, 65000);
