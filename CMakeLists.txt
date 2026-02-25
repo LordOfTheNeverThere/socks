@@ -16,6 +16,10 @@ add_executable(socks_dev
         include/socks/AddressInfo.h
         include/socks/types.h
         include/socks/NetworkListener.h
+        include/socks/GenericException.h
+        include/socks/NameResolutionException.h
+        include/socks/ServerSocketException.h
+        include/socks/ClientSocketException.h
 )
 
 target_link_libraries(socks_dev PRIVATE socks)

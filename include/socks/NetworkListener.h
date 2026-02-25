@@ -10,11 +10,15 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string>
+#include <system_error>
 #include <unistd.h>
 #include <vector>
 #include <arpa/inet.h>
 
 #include "AddressInfo.h"
+#include "ClientSocketException.h"
+#include "NameResolutionException.h"
+#include "ServerSocketException.h"
 #include "types.h"
 
 class NetworkListener {
@@ -65,30 +69,31 @@ private:
         Int setSocketOption = setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, &yes,sizeof(int));
         // Allows usage of ports in less than 2 mins after their closure.
         if ( setSocketOption == -1) {
-            perror("Got an error while clearing previously used ports");
             exit(1);
         }
 
         Int binding = bind(m_socket, reinterpret_cast<sockaddr*>(&interface.addr), interface.ipLength);
         if (binding == -1) {
-            close(m_socket);
-            perror(("Got an error while binding a socket to the interface's port :" + std::to_string(interface.port)).c_str());
+            closeSocket();
             continues = true;
         }
         return continues;
     }
+
 
     bool connectSocketToInterface(AddressInfo & interface) const {
         bool continues = false;
         Int connecting = connect(m_socket, reinterpret_cast<sockaddr*>(&interface.addr), interface.ipLength);
         if (connecting == -1) {
-            perror(("Got an error while connecting a socket to interface with IP and Port " + interface.ipString + ":" + std::to_string(interface.port)).c_str());
-            close(m_socket);
+            closeSocket();
             continues = true;
         }
         return continues;
     }
 
+    void closeSocket() const {
+        close(m_socket);
+    }
 public:
 
     [[nodiscard]] std::vector<AddressInfo> getInterfaces() const {
@@ -106,7 +111,7 @@ public:
 
         if ( status != 0 || result == nullptr) {
             std::string error {"The name resolution was not able to find any viable interfaces for the socket connection to " + hostname + " on port: " + port + " and IP version: " + std::to_string(ipVersion) + ".\n" + "Prompting the error with status code: " + gai_strerror(status)};
-            throw error;
+            throw NameResolutionException(error);
         }
         loadInterfaces(result);
     };
@@ -122,10 +127,12 @@ public:
 
         if ( status != 0 || result == nullptr) { // Resolve localhost's name and return available interfaces
             std::string error {"The name resolution was not able to find any viable interfaces for the socket connection to localhost on port: " + port + " and IP version: " + std::to_string(ipVersion) + ".\n" + "Prompting the error with status code: " + gai_strerror(status)};
-            throw error;
+            throw NameResolutionException(error);
         }
         loadInterfaces(result);
     };
+
+
     void createSocket(const bool isServer) {
 
         for (AddressInfo &interface: m_interfaces) {
@@ -138,22 +145,26 @@ public:
             }
 
             if (isServer) {
-                if (bindSocketToInterface(interface)) continue;
+                if (bindSocketToInterface(interface)) {
+                    const std::string error = "The binding of the socket to port: " + std::to_string(interface.port) + " failed. \n Reason: \n" + std::system_category().message(errno);
+                    throw ServerSocketException(error);
+                };
             }
             else {
-                if (connectSocketToInterface(interface)) continue;
+                if (connectSocketToInterface(interface)) {
+                    const std::string error = "The connection of the socket to IP and port: " + interface.ipString + ":" + std::to_string(interface.port) + " on the server failed. \n Reason: \n" + std::system_category().message(errno);
+                    throw ClientSocketException(error);
+                };
             }
             return;
         }
-        throw "It was not possible to bind any interface to the socket.";
+        if (isServer) {
+            throw ServerSocketException("It was not possible to bind any interface to the socket.");
+        }
+        else {
+            throw ClientSocketException("It was not possible to connect any interface to the socket.");
+        }
     }
-
-    void socketSending(){}
-
-
-    void socketListening(const bool isUnicast) {
-    }
-
 };
 
 
