@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string>
+#include <unistd.h>
 #include <vector>
 #include <arpa/inet.h>
 
@@ -20,8 +21,8 @@ class NetworkListener {
 
 private:
     std::vector<AddressInfo> m_interfaces {};
+    Int m_socket {};
 
-private:
     void loadInterfaces(addrinfo *result) {
 
         m_interfaces.clear();
@@ -57,6 +58,36 @@ private:
         freeaddrinfo(result); // This linked list is no longer required - Memory leak avoidance
     }
 
+    bool bindSocketToInterface(AddressInfo& interface) const {
+        bool continues = false;
+        bool yes = true;
+
+        Int setSocketOption = setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, &yes,sizeof(int));
+        // Allows usage of ports in less than 2 mins after their closure.
+        if ( setSocketOption == -1) {
+            perror("Got an error while clearing previously used ports");
+            exit(1);
+        }
+
+        Int binding = bind(m_socket, reinterpret_cast<sockaddr*>(&interface.addr), interface.ipLength);
+        if (binding == -1) {
+            close(m_socket);
+            perror(("Got an error while binding a socket to the interface's port :" + std::to_string(interface.port)).c_str());
+            continues = true;
+        }
+        return continues;
+    }
+
+    bool connectSocketToInterface(AddressInfo & interface) const {
+        bool continues = false;
+        Int connecting = connect(m_socket, reinterpret_cast<sockaddr*>(&interface.addr), interface.ipLength);
+        if (connecting == -1) {
+            perror(("Got an error while connecting a socket to interface with IP and Port " + interface.ipString + ":" + std::to_string(interface.port)).c_str());
+            close(m_socket);
+            continues = true;
+        }
+        return continues;
+    }
 
 public:
 
@@ -95,6 +126,34 @@ public:
         }
         loadInterfaces(result);
     };
+    void createSocket(const bool isServer) {
+
+        for (AddressInfo &interface: m_interfaces) {
+
+            m_socket = socket(interface.family, interface.socketType, interface.protocol);
+
+            if (m_socket == -1) {
+                perror("Got an error while creating a socket");
+                continue;
+            }
+
+            if (isServer) {
+                if (bindSocketToInterface(interface)) continue;
+            }
+            else {
+                if (connectSocketToInterface(interface)) continue;
+            }
+            return;
+        }
+        throw "It was not possible to bind any interface to the socket.";
+    }
+
+    void socketSending(){}
+
+
+    void socketListening(const bool isUnicast) {
+    }
+
 };
 
 
