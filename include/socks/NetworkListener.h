@@ -5,27 +5,36 @@
 #ifndef SOCKS_ADDRESSINFO_H
 #define SOCKS_ADDRESSINFO_H
 #include <cstring>
+#include <iostream>
 #include <memory>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <ostream>
+#include <signal.h>
 #include <string>
 #include <system_error>
 #include <unistd.h>
 #include <vector>
 #include <arpa/inet.h>
+#include <bits/sigaction.h>
+#include <sys/wait.h>
 
 #include "AddressInfo.h"
 #include "ClientSocketException.h"
 #include "NameResolutionException.h"
 #include "ServerSocketException.h"
 #include "types.h"
+#include "gtest/gtest_prod.h"
 
 class NetworkListener {
 
 private:
     std::vector<AddressInfo> m_interfaces {};
-    Int m_socket {};
+    Int m_socket {-1};
+
+    FRIEND_TEST(MethodChecking, createSocketAndBind);
+    FRIEND_TEST(MethodChecking, clientAndServerMock);
 
     void loadInterfaces(addrinfo *result) {
 
@@ -62,15 +71,23 @@ private:
         freeaddrinfo(result); // This linked list is no longer required - Memory leak avoidance
     }
 
-    bool bindSocketToInterface(AddressInfo& interface) const {
+    bool bindSocketToInterface(AddressInfo& interface) {
         bool continues = false;
-        bool yes = true;
+        Int yes = 1;
 
-        Int setSocketOption = setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, &yes,sizeof(int));
-        // Allows usage of ports in less than 2 mins after their closure.
+        Int setSocketOption = setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, &yes,sizeof(Int));
+
+
         if ( setSocketOption == -1) {
             exit(1);
         }
+
+        // setSocketOption = setsockopt(m_socket, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(Int));
+        //
+        // if ( setSocketOption == -1) {
+        //     exit(1);
+        // }
+        // Allows usage of ports and addresses in less than 2 mins after their closure.
 
         Int binding = bind(m_socket, reinterpret_cast<sockaddr*>(&interface.addr), interface.ipLength);
         if (binding == -1) {
@@ -81,7 +98,7 @@ private:
     }
 
 
-    bool connectSocketToInterface(AddressInfo & interface) const {
+    bool connectSocketToInterface(AddressInfo & interface) {
         bool continues = false;
         Int connecting = connect(m_socket, reinterpret_cast<sockaddr*>(&interface.addr), interface.ipLength);
         if (connecting == -1) {
@@ -91,8 +108,22 @@ private:
         return continues;
     }
 
-    void closeSocket() const {
-        close(m_socket);
+    static void sigChildHandler(Int s){
+        (void)s; // quiet unused variable warning
+
+        // waitpid() might overwrite errno, so we save and restore it:
+        const Int saved = errno;
+
+        while(waitpid(-1, nullptr, WNOHANG) > 0) {}
+
+        errno = saved;
+    }
+
+    void closeSocket() {
+        if (m_socket != -1) {
+            close(m_socket);
+            m_socket = -1; // Prevent double-close or closing wrong FDs
+        }
     }
 public:
 
@@ -165,11 +196,72 @@ public:
             throw ClientSocketException("It was not possible to connect any interface to the socket.");
         }
     }
+
+    void serverSends(void* msgToSend, size_t msgSize, Int connectionQueueNumber = 7, bool multiConnection = true) {
+        Int listening = listen(m_socket, connectionQueueNumber);
+        if (listening == -1) {
+            throw ServerSocketException("Could not make a listening socket for the server. \n Reason: \n" + std::system_category().message(errno));
+        }
+
+        sockaddr_storage clientAddress {};
+        socklen_t sizeClientAddress = sizeof(clientAddress);
+
+        if (multiConnection) {
+            struct sigaction sa {};
+            sa.sa_handler = sigChildHandler;
+            sigemptyset(&sa.sa_mask);
+            sa.sa_flags = SA_RESTART;
+            if (sigaction(SIGCHLD, &sa, nullptr) == -1) {
+                throw ServerSocketException("Could not reap zombie processes of previously closed connections");
+            }
+            while (true) {
+                Int connectedSocket = accept(m_socket, reinterpret_cast<sockaddr*>(&clientAddress), &sizeClientAddress);
+                if (connectedSocket == -1) {
+                    std::string ipNameBuffer {""};
+                    std::cerr << "It was not possible to accept the connection to the socket from: " ;
+                    if (reinterpret_cast<sockaddr*>(&clientAddress)->sa_family == AF_INET) {
+                        inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in));
+                    } else {
+                        inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in6));
+                    }
+                    std::cerr << ipNameBuffer.data();
+                    continue;
+                }
+                if (!fork()) { // this is the child process
+                    closeSocket(); // child doesn't need the listener
+                    if (send(connectedSocket, msgToSend, msgSize, 0) == -1)
+                        std::cerr << "Error sending. \n Reason: \n " + std::system_category().message(errno);
+                    close(connectedSocket);
+                    exit(0);
+                }
+                close(connectedSocket);  // parent doesn't need this
+            }
+        } else {
+            Int connectedSocket = accept(m_socket, reinterpret_cast<sockaddr*>(&clientAddress), &sizeClientAddress);
+            if (connectedSocket == -1) {
+                std::string ipNameBuffer {""};
+                if (reinterpret_cast<sockaddr*>(&clientAddress)->sa_family == AF_INET) {
+                    inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in));
+                } else {
+                    inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in6));
+                }
+                throw ServerSocketException("It was not possible to accept the connection to the socket from: " + ipNameBuffer);
+            }
+            closeSocket(); // Connection reached no more listening required
+            if (send(connectedSocket, msgToSend, msgSize, 0) == -1) {
+                throw ServerSocketException("Error sending. \n Reason: \n " + std::system_category().message(errno));
+            }
+            close(connectedSocket); // message was sent no more sending required.
+        }
+    }
+
+    Int clientCollects(void* msgReceived, const size_t msgSize) const {
+        const Int bytesReceived = static_cast<Int>(recv(m_socket, msgReceived, msgSize, 0));
+        if (bytesReceived == -1) {
+            throw ClientSocketException("It was not possible for the client to collect the message from the server. \n Reason : \n " + std::system_category().message(errno));
+        }
+        return bytesReceived;
+    }
 };
-
-
-
-
-
 
 #endif //SOCKS_ADDRESSINFO_H
