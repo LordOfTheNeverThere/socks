@@ -18,11 +18,16 @@ TEST(MethodChecking, LocalhostResponse) {
 
 TEST(ErrorChecking, LocalhostResponseError) {
     NetworkListener socket;
+    EXPECT_THROW({
     try {
         socket.fetchInterfacesToBind("8080", 7, 0);
-    } catch (GenericException& error) {
-        EXPECT_EQ(error.what(), "The name resolution was not able to find any viable interfaces for the socket connection to localhost on port: 8080 and IP version: 7.\nPrompting the error with status code: ai_family not supported");
+    } catch( const GenericException& e ) {
+        EXPECT_STREQ("The name resolution was not able to find any viable interfaces for the socket connection to localhost on port: 8080 and IP version: 7."
+                     "\nPrompting the error with status code: ai_family not supported"
+            , e.what());
+        throw; // Re-throw so EXPECT_THROW sees it
     }
+}, GenericException);
 }
 
 
@@ -43,11 +48,17 @@ TEST(MethodChecking, RemoteHostResponse) {
 TEST(ErrorChecking, RemoteHostResponseError) {
 
     NetworkListener socket;
-    try {
-        socket.fetchInterfacesToConnect("myata","65000", AF_INET6, 0);
-    } catch (GenericException& error) {
-        EXPECT_EQ(error.what(), "The name resolution was not able to find any viable interfaces for the socket connection to myata on port: 65000 and IP version: 10.\nPrompting the error with status code: Temporary failure in name resolution");
-    }
+
+    EXPECT_THROW({
+        try {
+            socket.fetchInterfacesToConnect("myata","65000", AF_INET6, 0);
+        } catch( const GenericException& e ) {
+            EXPECT_STREQ("The name resolution was not able to find any viable interfaces for the socket connection to myata on port: 65000 and IP version: 10."
+                         "\nPrompting the error with status code: Temporary failure in name resolution"
+                , e.what());
+            throw; // Re-throw so EXPECT_THROW sees it
+        }
+    }, GenericException);
 }
 
 
