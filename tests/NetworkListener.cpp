@@ -67,7 +67,7 @@ TEST(MethodChecking, createSocketAndBind) {
 
 
 
-
+//Single Connection
 TEST(MethodChecking, clientAndServerMock) {
     NetworkListener client;
     client.fetchInterfacesToConnect("localhost", "8088", AF_INET, 0);
@@ -84,13 +84,67 @@ TEST(MethodChecking, clientAndServerMock) {
     usleep(50000);
     client.createSocket(false);
     client.clientCollects(incoming, 5);
-    for (Int i = 0; i < 5; i++) {
-        EXPECT_EQ(incoming[i],incoming[i]);
-    }
+    EXPECT_TRUE(!strcmp(incoming, outgoing));
     client.closeSocket();
     EXPECT_EQ(client.m_socket, -1);
     EXPECT_EQ(server.m_socket, -1);
 }
 
 
+// Multiple connections
+TEST(MethodChecking, twoClientAndServerMock) {
 
+    Int connectionTimeout = 5;
+
+    NetworkListener clientOne;
+    clientOne.fetchInterfacesToConnect("localhost", "8088", AF_INET, 0);
+    NetworkListener clientTwo;
+    clientTwo.fetchInterfacesToConnect("localhost", "8088", AF_INET, 0);
+    NetworkListener server;
+    server.fetchInterfacesToBind("8088", AF_INET, 0);
+
+    char* outgoing = "PING";
+
+    if (!fork()) {
+        server.createSocket(true);
+        try {
+            server.serverSends(outgoing, 5, 5, true, connectionTimeout);
+
+        } catch (GenericException caught) {
+            std::cerr << caught.what() << "\n";
+        }
+
+        exit(0);
+    }
+
+    int pipefds[2];
+    pipe(pipefds); // [0] is read, [1] is write
+    if (!fork()) {
+        close(pipefds[0]); // Close read end
+        clientOne.createSocket(false);
+        char incoming[5] = {0};
+        clientOne.clientCollects(incoming, 5);
+
+        bool success = !strcmp(incoming, outgoing);
+        write(pipefds[1], &success, sizeof(success));
+
+        server.closeSocket();
+        _exit(0);
+    }
+
+    close(pipefds[1]); // Close write end
+    bool childSuccess = false;
+    read(pipefds[0], &childSuccess, sizeof(childSuccess));
+    EXPECT_TRUE(childSuccess);
+
+    char incoming[5] = {0};
+    clientTwo.createSocket(false);
+    clientTwo.clientCollects(incoming, 5);
+    EXPECT_TRUE(!strcmp(incoming, outgoing));
+
+    clientOne.closeSocket();
+    clientTwo.closeSocket();
+    EXPECT_EQ(clientOne.m_socket, -1);
+    EXPECT_EQ(server.m_socket, -1);
+    sleep(connectionTimeout - 2);
+}

@@ -4,6 +4,7 @@
 
 #ifndef SOCKS_ADDRESSINFO_H
 #define SOCKS_ADDRESSINFO_H
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -35,6 +36,7 @@ private:
 
     FRIEND_TEST(MethodChecking, createSocketAndBind);
     FRIEND_TEST(MethodChecking, clientAndServerMock);
+    FRIEND_TEST(MethodChecking, twoClientAndServerMock);
 
     void loadInterfaces(addrinfo *result) {
 
@@ -107,6 +109,60 @@ private:
         }
         return continues;
     }
+
+
+    void handleMultipleSends(const void *msgToSend, const size_t& msgSize, const Int& durationSeconds, sockaddr_storage& clientAddress, socklen_t& sizeClientAddress) {
+        struct sigaction sa {};
+        sa.sa_handler = sigChildHandler;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = SA_RESTART;
+        if (sigaction(SIGCHLD, &sa, nullptr) == -1) {
+            throw ServerSocketException("Could not reap zombie processes of previously closed connections");
+        }
+        while (true) {
+            if (durationSeconds > 0) {
+                fd_set readfds;
+                FD_ZERO(&readfds);
+                FD_SET(m_socket, &readfds);
+
+                timeval tv {};
+                tv.tv_sec = durationSeconds;
+                tv.tv_usec = 0;
+                //If durationSeconds is -1, we wait indefinitely (NULL in select)
+                // The Guard: Only proceed to accept if select says data is ready on the fds mentioned in readfds
+                int activity = select(m_socket + 1, &readfds, nullptr, nullptr, &tv);
+
+                if (activity < 0 && errno == EINTR) {
+                    continue; // Interrupted by signal
+                }
+                else if (activity == 0) {
+                    //timeout reached
+                    throw ServerSocketException("Server waited for " + std::to_string(durationSeconds) + " seconds, but no connection attempt was made.");
+                }
+            }
+            Int connectedSocket = accept(m_socket, reinterpret_cast<sockaddr*>(&clientAddress), &sizeClientAddress);
+            if (connectedSocket == -1) {
+                std::string ipNameBuffer {""};
+                std::cerr << "It was not possible to accept the connection to the socket from: " ;
+                if (reinterpret_cast<sockaddr*>(&clientAddress)->sa_family == AF_INET) {
+                    inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in));
+                } else {
+                    inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in6));
+                }
+                std::cerr << ipNameBuffer.data();
+                continue;
+            }
+            if (!fork()) { // this is the child process
+                closeSocket(); // child doesn't need the listener
+                if (send(connectedSocket, msgToSend, msgSize, 0) == -1)
+                    std::cerr << "Error sending. \n Reason: \n " + std::system_category().message(errno);
+                close(connectedSocket);
+                exit(0);
+            }
+            close(connectedSocket);  // parent doesn't need this
+        }
+    }
+
 
     static void sigChildHandler(Int s){
         (void)s; // quiet unused variable warning
@@ -197,7 +253,7 @@ public:
         }
     }
 
-    void serverSends(void* msgToSend, size_t msgSize, Int connectionQueueNumber = 7, bool multiConnection = true) {
+    void serverSends(void* msgToSend, size_t msgSize, Int connectionQueueNumber = 7, bool multiConnection = true, Int durationSeconds = -1) {
         Int listening = listen(m_socket, connectionQueueNumber);
         if (listening == -1) {
             throw ServerSocketException("Could not make a listening socket for the server. \n Reason: \n" + std::system_category().message(errno));
@@ -207,35 +263,7 @@ public:
         socklen_t sizeClientAddress = sizeof(clientAddress);
 
         if (multiConnection) {
-            struct sigaction sa {};
-            sa.sa_handler = sigChildHandler;
-            sigemptyset(&sa.sa_mask);
-            sa.sa_flags = SA_RESTART;
-            if (sigaction(SIGCHLD, &sa, nullptr) == -1) {
-                throw ServerSocketException("Could not reap zombie processes of previously closed connections");
-            }
-            while (true) {
-                Int connectedSocket = accept(m_socket, reinterpret_cast<sockaddr*>(&clientAddress), &sizeClientAddress);
-                if (connectedSocket == -1) {
-                    std::string ipNameBuffer {""};
-                    std::cerr << "It was not possible to accept the connection to the socket from: " ;
-                    if (reinterpret_cast<sockaddr*>(&clientAddress)->sa_family == AF_INET) {
-                        inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in));
-                    } else {
-                        inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in6));
-                    }
-                    std::cerr << ipNameBuffer.data();
-                    continue;
-                }
-                if (!fork()) { // this is the child process
-                    closeSocket(); // child doesn't need the listener
-                    if (send(connectedSocket, msgToSend, msgSize, 0) == -1)
-                        std::cerr << "Error sending. \n Reason: \n " + std::system_category().message(errno);
-                    close(connectedSocket);
-                    exit(0);
-                }
-                close(connectedSocket);  // parent doesn't need this
-            }
+            handleMultipleSends(msgToSend, msgSize, durationSeconds, clientAddress, sizeClientAddress);
         } else {
             Int connectedSocket = accept(m_socket, reinterpret_cast<sockaddr*>(&clientAddress), &sizeClientAddress);
             if (connectedSocket == -1) {
@@ -253,6 +281,7 @@ public:
             }
             close(connectedSocket); // message was sent no more sending required.
         }
+        closeSocket(); // The Listener is no longer required after all has been sent.
     }
 
     Int clientCollects(void* msgReceived, const size_t msgSize) const {
