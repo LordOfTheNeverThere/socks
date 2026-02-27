@@ -1,11 +1,11 @@
-add_executable(unit_tests NetworkListener.cpp)
+add_executable(socksTests NetworkListener.cpp)
 
 
-target_link_libraries(unit_tests
+target_link_libraries(socksTests
         PRIVATE
         socks
         GTest::gtest_main
 )
 
 include(GoogleTest)
-gtest_discover_tests(unit_tests)
+gtest_discover_tests(socksTests)
