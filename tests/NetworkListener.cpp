@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include "socks/Socket.h"
+
 
 TEST(MethodChecking, LocalhostResponse) {
     NetworkListener socket;
@@ -67,12 +69,13 @@ TEST(MethodChecking, createSocketAndBind) {
     listener.fetchInterfacesToBind("8080", 0, 0);
     std::string error {""};
     try {
-        listener.createSocket(true);
+        Socket socket =  Socket(listener, true);
+        EXPECT_NE(socket.m_socket, -1);
     } catch (GenericException& caught) {
         error = caught.what();
     }
     EXPECT_EQ(error,"");
-    EXPECT_NE(listener.m_socket, -1);
+
 }
 
 
@@ -87,18 +90,26 @@ TEST(MethodChecking, clientAndServerMock) {
     char* outgoing = "PING";
     char incoming[5] = {0}; // 4 chars + 1 for null terminator
 
+    int pipefds[2];
+    pipe(pipefds); // [0] is read, [1] is write
     if (!fork()) {
-        server.createSocket(true);
-        server.serverSends(outgoing, 5, 1, false);
+        close(pipefds[0]);
+
+        Socket serverSocket =  Socket(server, true);
+        serverSocket.send(outgoing, 5, 1, false);
+
+        write(pipefds[1], &serverSocket.m_socket, sizeof(serverSocket.m_socket));
         _exit(0);
     }
     usleep(50000);
-    client.createSocket(false);
-    client.clientCollects(incoming, 5);
+    Socket clientSocket =  Socket(client, false);
+    clientSocket.receive(incoming, 5);
     EXPECT_TRUE(!strcmp(incoming, outgoing));
-    client.closeSocket();
-    EXPECT_EQ(client.m_socket, -1);
-    EXPECT_EQ(server.m_socket, -1);
+    clientSocket.closeSocket();
+    EXPECT_EQ(clientSocket.m_socket, -1);
+    Int serverSocket {0};
+    read(pipefds[0], &serverSocket, sizeof(serverSocket));
+    EXPECT_EQ(serverSocket, -1);
 }
 
 
@@ -116,30 +127,31 @@ TEST(MethodChecking, twoClientAndServerMock) {
 
     char* outgoing = "PING";
 
+
     if (!fork()) {
-        server.createSocket(true);
         try {
-            server.serverSends(outgoing, 5, 5, true, connectionTimeout);
+            Socket serverSocket =  Socket(server, true);
+            serverSocket.send(outgoing, 5, 5, true, connectionTimeout);
 
         } catch (GenericException caught) {
             std::cerr << caught.what() << "\n";
         }
-
         exit(0);
     }
 
     int pipefds[2];
     pipe(pipefds); // [0] is read, [1] is write
+
     if (!fork()) {
         close(pipefds[0]); // Close read end
-        clientOne.createSocket(false);
+        Socket clientOneSocket = Socket(clientOne, false);
         char incoming[5] = {0};
-        clientOne.clientCollects(incoming, 5);
+        clientOneSocket.receive(incoming, 5);
 
         bool success = !strcmp(incoming, outgoing);
         write(pipefds[1], &success, sizeof(success));
 
-        server.closeSocket();
+        clientOneSocket.closeSocket();
         _exit(0);
     }
 
@@ -149,13 +161,11 @@ TEST(MethodChecking, twoClientAndServerMock) {
     EXPECT_TRUE(childSuccess);
 
     char incoming[5] = {0};
-    clientTwo.createSocket(false);
-    clientTwo.clientCollects(incoming, 5);
+    Socket clientTwoSocket = Socket(clientTwo, false);
+    clientTwoSocket.receive(incoming, 5);
     EXPECT_TRUE(!strcmp(incoming, outgoing));
 
-    clientOne.closeSocket();
-    clientTwo.closeSocket();
-    EXPECT_EQ(clientOne.m_socket, -1);
-    EXPECT_EQ(server.m_socket, -1);
+    clientTwoSocket.closeSocket();
+    EXPECT_EQ(clientTwoSocket.m_socket, -1);
     sleep(connectionTimeout - 2);
 }

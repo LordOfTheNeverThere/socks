@@ -20,6 +20,7 @@ add_executable(socks_dev
         include/socks/NameResolutionException.h
         include/socks/ServerSocketException.h
         include/socks/ClientSocketException.h
+        include/socks/Socket.h
 )
 
 target_link_libraries(socks_dev PRIVATE socks)
