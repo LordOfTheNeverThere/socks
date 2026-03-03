@@ -1,4 +1,6 @@
-add_executable(socksTests NetworkListener.cpp)
+add_executable(socksTests NetworkListener.cpp
+        RawSocket.cpp
+        Tools.cpp)
 
 
 target_link_libraries(socksTests
