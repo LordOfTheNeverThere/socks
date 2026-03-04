@@ -4,6 +4,8 @@
 
 #ifndef SOCKS_RAWSOCKETEXCEPTION_H
 #define SOCKS_RAWSOCKETEXCEPTION_H
+#include "GenericException.h"
+
 class RawSocketException : public GenericException {
 public:
     RawSocketException(const std::string& error) : GenericException(error) {}

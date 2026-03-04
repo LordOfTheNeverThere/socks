@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "socks/Socket.h"
+#include "socks/L4Socket.h"
 
 
 TEST(MethodChecking, LocalhostResponse) {
@@ -69,7 +69,7 @@ TEST(MethodChecking, createSocketAndBind) {
     listener.fetchInterfacesToBind("8080", 0, 0);
     std::string error {""};
     try {
-        Socket socket =  Socket(listener, true);
+        L4Socket socket =  L4Socket(listener, true);
         EXPECT_NE(socket.m_socket, -1);
     } catch (GenericException& caught) {
         error = caught.what();
@@ -95,14 +95,14 @@ TEST(MethodChecking, clientAndServerMock) {
     if (!fork()) {
         close(pipefds[0]);
 
-        Socket serverSocket =  Socket(server, true);
+        L4Socket serverSocket =  L4Socket(server, true);
         serverSocket.send(outgoing, 5, 1, false);
 
         write(pipefds[1], &serverSocket.m_socket, sizeof(serverSocket.m_socket));
         _exit(0);
     }
     usleep(50000);
-    Socket clientSocket =  Socket(client, false);
+    L4Socket clientSocket =  L4Socket(client, false);
     clientSocket.receive(incoming, 5);
     EXPECT_TRUE(!strcmp(incoming, outgoing));
     clientSocket.closeSocket();
@@ -130,7 +130,7 @@ TEST(MethodChecking, twoClientAndServerMock) {
 
     if (!fork()) {
         try {
-            Socket serverSocket =  Socket(server, true);
+            L4Socket serverSocket =  L4Socket(server, true);
             serverSocket.send(outgoing, 5, 5, true, connectionTimeout);
 
         } catch (GenericException caught) {
@@ -144,7 +144,7 @@ TEST(MethodChecking, twoClientAndServerMock) {
 
     if (!fork()) {
         close(pipefds[0]); // Close read end
-        Socket clientOneSocket = Socket(clientOne, false);
+        L4Socket clientOneSocket = L4Socket(clientOne, false);
         char incoming[5] = {0};
         clientOneSocket.receive(incoming, 5);
 
@@ -161,7 +161,7 @@ TEST(MethodChecking, twoClientAndServerMock) {
     EXPECT_TRUE(childSuccess);
 
     char incoming[5] = {0};
-    Socket clientTwoSocket = Socket(clientTwo, false);
+    L4Socket clientTwoSocket = L4Socket(clientTwo, false);
     clientTwoSocket.receive(incoming, 5);
     EXPECT_TRUE(!strcmp(incoming, outgoing));
 

@@ -11,27 +11,25 @@ class Tools {
 
     Tools() {};
 
-    uint16_t static add16BitOnesComplement(uint16_t a, uint16_t b) {
+    uint16_t static add16BitOnesComplement(const uint8_t* packetPtr, const uint64_t& packetSize) {
         uint32_t bucketSum = 0;
-        bucketSum += a;
-        bucketSum += b;
+        for (int i = 0; i < packetSize; i = i + 2) {
+            uint16_t twoBytes {0};
+            if (i == packetSize -1) { //handling oddbytes
+                twoBytes = (packetPtr[i] << 8);
+            } else {
+                twoBytes = (packetPtr[i] << 8) + packetPtr[i + 1];
+            }
+            bucketSum = bucketSum + twoBytes;
+        }
 
         while (bucketSum > 0xFFFF) {
-            uint32_t carryOver = (bucketSum & ~0xFFFF) >> 16;
+            const uint16_t carryOver = (bucketSum >> 16);
             bucketSum = bucketSum & 0xFFFF;
             bucketSum = bucketSum + carryOver;
         }
 
         return static_cast<uint16_t>(bucketSum);
-    }
-
-    uint16_t static icmpChecksum(uint64_t& header) {
-        uint16_t checkSum = 0;
-        for (uint64_t mask = 0xFFFF; mask <= (mask << (sizeof(header)*8 - 16)); mask <<= 16) {
-
-            checkSum = add16BitOnesComplement(checkSum,(header & mask));
-        }
-        return checkSum;
     }
 };
 

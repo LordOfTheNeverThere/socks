@@ -21,7 +21,7 @@ class NetworkListener {
 private:
     std::vector<AddressInfo> m_interfaces {};
 
-    friend class Socket;
+    friend class L4Socket;
 
     void loadInterfaces(addrinfo *result) {
 
