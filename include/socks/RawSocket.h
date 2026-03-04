@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <chrono>
 #include <cstring>
+#include <arpa/inet.h>
 
 #include "RawSocketException.h"
 #include "Socket.h"
@@ -16,8 +17,12 @@
 
 
 class RawSocket : private Socket {
+
+private:
+    Int m_ipVersion {0};
+    Int m_protocol {0};
 public:
-    RawSocket(Int& ipVersion, Int& protocol) {
+    RawSocket(const Int& ipVersion, const Int& protocol) : m_ipVersion(ipVersion), m_protocol(protocol) {
         m_socket = socket(ipVersion, SOCK_RAW, protocol);
         if (m_socket == -1) {
             throw RawSocketException("The creation of the raw socket for protocol with ID: " + std::to_string(protocol) + " failed. \n Reason: \n" + std::system_category().message(errno));
@@ -44,13 +49,29 @@ public:
         memcpy(packet + 2, &checksum, sizeof(checksum)); //Populate the packet with the checksum value
     }
 
-    void pinging(bool generateIPHeader = true) {
+    void sendPing(const std::string& destIP, bool generateIPHeader = true) const {
         const size_t headerSize = sizeof(icmp);
         const size_t nanosecsSize = sizeof(uint64_t);
 
         // create memory buffer to load the packet unto
         uint8_t packet[headerSize + nanosecsSize] = {};
         constructICMPPacket(packet, headerSize, nanosecsSize);
+        sockaddr_storage destination {};
+        destination.ss_family = m_ipVersion;
+
+        if (m_ipVersion == AF_INET) {
+            inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in*>(&destination)->sin_addr));
+        } else if (m_ipVersion == AF_INET6) {
+            inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in6*>(&destination)->sin6_addr));
+        } else {
+            throw RawSocketException("The family type with ID: " + std::to_string(m_ipVersion) + " is not supported.");
+        }
+
+        Int sent = sendto(m_socket, packet, headerSize + nanosecsSize, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+
+        if (sent == -1) {
+            throw RawSocketException("Ping to " + destIP + " failed. \n Reason: \n" + std::system_category().message(errno));
+        }
     }
 
 };
