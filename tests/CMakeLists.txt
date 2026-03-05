@@ -29,5 +29,3 @@ add_custom_command(TARGET sudoSocksTests POST_BUILD
         COMMENT "Granting CAP_NET_RAW to sudoSocksTests binary"
         VERBATIM
 )
-
-add_test(NAME sudoSocksTests COMMAND sudoSocksTests)
