@@ -44,7 +44,7 @@ TEST(MethodChecking, sendPingReceivePing) {
     char initialSenderIP[INET_ADDRSTRLEN];
     char initialDestinationIP[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(ipHeader.ip_src), initialDestinationIP, INET_ADDRSTRLEN);
-    inet_ntop(AF_INET, &(ipHeader.ip_dst), initialSenderIP, INET_ADDRSTRLEN); // roles have reversed whence of the reply
+    inet_ntop(AF_INET, &(ipHeader.ip_dst), initialSenderIP, INET_ADDRSTRLEN); // roles have reversed after the reply
     EXPECT_TRUE(strcmp(initialDestinationIP, destinationIP.c_str())==0);
     EXPECT_TRUE(strcmp(initialSenderIP, senderIP.c_str())==0);
 }
