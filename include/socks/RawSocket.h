@@ -13,6 +13,8 @@
 #include "RawSocketException.h"
 #include "Socket.h"
 #include <netinet/ip_icmp.h>
+
+#include "IPv4Header.h"
 #include "Tools.h"
 
 
@@ -21,6 +23,7 @@ class RawSocket : private Socket {
 private:
     Int m_ipVersion {0};
     Int m_protocol {0};
+    IPv4Header m_ipHeader {IPv4Header()};
 public:
     RawSocket(const Int& ipVersion, const Int& protocol) :  m_protocol(protocol) {
 
@@ -36,9 +39,34 @@ public:
         }
     }
 
-    static void constructICMPPacket(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const Int& seqNum) {
-        std::memset(packet, 0, headerSize + nanosecsSize);
+    void setIPHeader(IPv4Header& ipHeader) {
+        if (ipHeader.header != nullptr) {
+            ipHeader.setProtocol(IPPROTO_ICMP);
+            m_ipHeader = ipHeader;
+            Int one = 1;
+            Int socketOpt = setsockopt(m_socket,IPPROTO_IP,IP_HDRINCL, &one, sizeof(one));
+            if (socketOpt == -1) {
+                throw RawSocketException("The setting of the socket option IP_HDRINCL failed.\nReason:\n" + std::system_category().message(errno));
+            }
+        }
+    }
 
+    [[nodiscard]] bool autogenerateIPHeader() const {
+        return m_ipHeader.header == nullptr;
+    }
+
+    size_t constructICMPPacketWithIPHeader(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const Int& seqNum)  {
+
+        size_t ipHeaderSize {m_ipHeader.getIHL()};
+        m_ipHeader.setTotalLength(ipHeaderSize + headerSize + nanosecsSize);
+        std::memset(packet, 0, ipHeaderSize + headerSize + nanosecsSize);
+        std::memcpy(packet, m_ipHeader.header, m_ipHeader.getIHL());
+
+        return ipHeaderSize + constructICMPPacket(packet + m_ipHeader.getIHL() , headerSize, nanosecsSize, seqNum);
+    }
+
+    static size_t constructICMPPacket(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const Int& seqNum) {
+        std::memset(packet, 0, headerSize + nanosecsSize);
         icmp icmpHeader {};
         // Build ICMP Header
         icmpHeader.icmp_type = ICMP_ECHO;
@@ -54,15 +82,14 @@ public:
 
         const uint16_t checksum = htons(~Tools::add16BitOnesComplement(packet, headerSize + nanosecsSize)); // calculate one's complement of the 8bitOnesComplementSum
         memcpy(packet + 2, &checksum, sizeof(checksum)); //Populate the packet with the checksum value
+
+        return headerSize + nanosecsSize;
     }
 
-    void sendPing(const std::string& destIP, bool generateIPHeader = true,  const Int& seqNum = 0) const {
-        const size_t headerSize = sizeof(icmphdr); //use icmphdr instead of icmp for requests, icmp has part of the IP header which caused the host to reply with an error, since this is request it is nonsensical to include it here
-        const size_t nanosecsSize = sizeof(uint64_t);
 
-        // create memory buffer to load the packet unto
-        uint8_t packet[headerSize + nanosecsSize] = {};
-        constructICMPPacket(packet, headerSize, nanosecsSize, seqNum);
+    size_t sendPing(const std::string& destIP, const Int& seqNum = 0){
+
+
         sockaddr_storage destination {};
         destination.ss_family = m_ipVersion;
 
@@ -72,11 +99,29 @@ public:
             inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in6*>(&destination)->sin6_addr));
         }
 
-        Int sent = sendto(m_socket, packet, headerSize + nanosecsSize, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+        const size_t headerSize = sizeof(icmphdr); //use icmphdr instead of icmp for requests, icmp has part of the IP header which caused the host to reply with an error, since this is request it is nonsensical to include it here
+        const size_t nanosecsSize = sizeof(uint64_t);
+        size_t bytesToSend {0};
+        size_t sent {0};
+
+        if (autogenerateIPHeader()) {
+            uint8_t packet[headerSize + nanosecsSize];
+            bytesToSend = constructICMPPacket(packet, headerSize, nanosecsSize, seqNum);
+            sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+        } else {
+            size_t ipHeaderSize = m_ipHeader.getIHL();
+            // create memory buffer to load the packet unto
+            uint8_t packet[ipHeaderSize + headerSize + nanosecsSize];
+            bytesToSend = constructICMPPacketWithIPHeader(packet, headerSize, nanosecsSize, seqNum);
+            sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+        }
 
         if (sent == -1) {
             throw RawSocketException("Ping to " + destIP + " failed. \n Reason: \n" + std::system_category().message(errno));
+        } else if (bytesToSend != sent) {
+            throw RawSocketException("Not all of the packet was sent.\n Packet size: " + std::to_string(bytesToSend) + "\nSent: " + std::to_string(sent));
         }
+        return sent;
     }
 
     void receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "") const {

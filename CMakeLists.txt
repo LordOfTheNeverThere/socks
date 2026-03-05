@@ -25,6 +25,7 @@ add_executable(socks_dev
         include/socks/RawSocketException.h
         include/socks/Tools.h
         include/socks/Socket.h
+        include/socks/IPv4Header.h
 )
 
 target_link_libraries(socks_dev PRIVATE socks)
