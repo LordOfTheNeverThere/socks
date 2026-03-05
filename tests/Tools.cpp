@@ -3,7 +3,7 @@
 
 #include <netinet/in.h>
 
-TEST(MethodTesting, add16BitOnesComplement) {
+TEST(MethodChecking, add16BitOnesComplement) {
 
     uint16_t a = htons(0xFFFF);
     uint16_t b = htons(0x000F);
@@ -17,7 +17,7 @@ TEST(MethodTesting, add16BitOnesComplement) {
 }
 
 
-TEST(MethodTesting, ICMPChecksumValidation) {
+TEST(MethodChecking, ICMPChecksumValidation) {
     uint8_t packet[] = { 0x08, 0x00, 0x00, 0x00, 0x12, 0x34, 0x00, 0x01 };
     uint16_t checksum = htons(~Tools::add16BitOnesComplement(packet, 8));
     memcpy(packet + 2, &checksum, 2);
