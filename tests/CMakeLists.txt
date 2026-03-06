@@ -21,11 +21,4 @@ target_link_libraries(sudoSocksTests
 include(GoogleTest)
 
 gtest_discover_tests(socksTests)
-
-
-# Post-build command to grant raw socket capabilities
-add_custom_command(TARGET sudoSocksTests POST_BUILD
-        COMMAND sudo setcap cap_net_raw+ep $<TARGET_FILE:sudoSocksTests>
-        COMMENT "Granting CAP_NET_RAW to sudoSocksTests binary"
-        VERBATIM
-)
+gtest_discover_tests(sudoSocksTests)

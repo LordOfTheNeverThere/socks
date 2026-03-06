@@ -5,7 +5,7 @@
 #ifndef SOCKS_IPHEADER_H
 #define SOCKS_IPHEADER_H
 
-#include <cstring>
+#include <iostream>
 #include <string>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
@@ -19,24 +19,31 @@ public:
     IPv4Header() : header(nullptr) {}
 
     IPv4Header(void* buffer) {
+        if (buffer == nullptr) {
+            throw RawSocketException("IPv4Header Constructor requires a non-null buffer.");
+        }
         header = reinterpret_cast<struct ip*>(buffer);
     }
 
     IPv4Header(void* buffer, const char* srcIP, const char* destIP, uint16_t packetSize, Int protocol) {
-        header = reinterpret_cast<struct ip*>(buffer);
-        std::memset(header, 0, sizeof(struct ip));
 
+        if (buffer == nullptr) {
+            throw RawSocketException("IPv4Header Constructor requires a non-null buffer.");
+        }
+
+        header = reinterpret_cast<struct ip*>(buffer);
         setVersion(4);
-        setIHL(5);              // Standard 20-byte header
+        setIHL(5);              // Standard 20-byte header(naked of options)
         setTotalLength(packetSize);
         setTTL(64);             // Default TTL
         setProtocol(protocol);
+        setChecksum(0);
         setSource(srcIP);
         setDestination(destIP);
     }
 
     uint8_t  getVersion()      const { return header->ip_v; }
-    uint8_t  getIHL()          const { return header->ip_hl; }
+    uint8_t  getHeaderLenghtInBytes() const { return (getIHL())*4; }
     uint8_t  getTOS()          const { return header->ip_tos; }
     uint16_t getTotalLength()  const { return ntohs(header->ip_len); }
     uint16_t getID()           const { return ntohs(header->ip_id); }
@@ -45,10 +52,19 @@ public:
     uint16_t getChecksum()     const { return ntohs(header->ip_sum); }
 
     std::string getSourceStr() const {
-        return inet_ntoa(header->ip_src);
+        char buffer[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &(header->ip_src), buffer, INET_ADDRSTRLEN) == nullptr) {
+            throw RawSocketException("Unable to convert source IP address to Human Readable string.\nReason:\n " + std::system_category().message(errno));
+        }
+        return std::string(buffer);
     }
+
     std::string getDestStr() const {
-        return inet_ntoa(header->ip_dst);
+        char buffer[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &(header->ip_dst), buffer, INET_ADDRSTRLEN) == nullptr) {
+            throw RawSocketException("Unable to convert destination IP address to Human Readable string.\nReason:\n " + std::system_category().message(errno));
+        }
+        return std::string(buffer);
     }
 
     void setVersion(uint8_t v)      { header->ip_v = v; }
@@ -67,6 +83,9 @@ public:
     void setDestination(const char* ip) {
         inet_pton(AF_INET, ip, &(header->ip_dst));
     }
+
+private:
+    uint8_t  getIHL()          const { return header->ip_hl; }
 };
 
 

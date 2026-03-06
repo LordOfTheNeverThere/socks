@@ -57,12 +57,12 @@ public:
 
     size_t constructICMPPacketWithIPHeader(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const Int& seqNum)  {
 
-        size_t ipHeaderSize {m_ipHeader.getIHL()};
+        size_t ipHeaderSize {m_ipHeader.getHeaderLenghtInBytes()};
         m_ipHeader.setTotalLength(ipHeaderSize + headerSize + nanosecsSize);
         std::memset(packet, 0, ipHeaderSize + headerSize + nanosecsSize);
-        std::memcpy(packet, m_ipHeader.header, m_ipHeader.getIHL());
+        std::memcpy(packet, m_ipHeader.header, ipHeaderSize);
 
-        return ipHeaderSize + constructICMPPacket(packet + m_ipHeader.getIHL() , headerSize, nanosecsSize, seqNum);
+        return ipHeaderSize + constructICMPPacket(packet + ipHeaderSize, headerSize, nanosecsSize, seqNum);
     }
 
     static size_t constructICMPPacket(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const Int& seqNum) {
@@ -109,7 +109,7 @@ public:
             bytesToSend = constructICMPPacket(packet, headerSize, nanosecsSize, seqNum);
             sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
         } else {
-            size_t ipHeaderSize = m_ipHeader.getIHL();
+            size_t ipHeaderSize = m_ipHeader.getHeaderLenghtInBytes();
             // create memory buffer to load the packet unto
             uint8_t packet[ipHeaderSize + headerSize + nanosecsSize];
             bytesToSend = constructICMPPacketWithIPHeader(packet, headerSize, nanosecsSize, seqNum);
