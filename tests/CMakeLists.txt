@@ -1,5 +1,7 @@
 add_executable(socksTests NetworkListener.cpp
-        Tools.cpp)
+        Tools.cpp
+        Host.cpp
+)
 
 
 add_executable(sudoSocksTests

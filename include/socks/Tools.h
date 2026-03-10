@@ -4,6 +4,10 @@
 
 #ifndef SOCKS_TOOLS_H
 #define SOCKS_TOOLS_H
+#include <iomanip>
+#include <sstream>
+#include <netpacket/packet.h>
+
 #include "types.h"
 
 class Tools {
@@ -30,6 +34,19 @@ class Tools {
         }
 
         return static_cast<uint16_t>(bucketSum);
+    }
+
+
+    static std::string macToString(struct sockaddr_ll *s) {
+        std::ostringstream oss;
+
+        for (int i = 0; i < s->sll_halen; ++i) {
+            // Make the stream interpret the following values as hexadecimal, each input will be at least two digits wide, and if there is a zero it should be printed as such and not as space
+            oss << std::hex << std::setw(2) << std::setfill('0')
+                << static_cast<int>(s->sll_addr[i]);
+        }
+
+        return oss.str();
     }
 };
 
