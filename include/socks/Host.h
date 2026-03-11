@@ -20,33 +20,70 @@
 #include "types.h"
 
 class Host {
-
 private:
     std::string m_name {};
     std::string m_ipAddress {};
     std::string m_networkMask {};
-    std::string m_defaultGateway {};
     std::string m_macAddress {};
 
-
     bool isObjectPopulated() const {
-        return !(m_name.empty() || m_ipAddress.empty() || m_networkMask.empty() || m_defaultGateway.empty() || m_macAddress.empty());
+        return !(m_name.empty() || m_ipAddress.empty() || m_networkMask.empty() || m_macAddress.empty());
+    }
+    void clearAttributes() {
+        m_name = "";
+        m_ipAddress = "";
+        m_networkMask = "";
+        m_macAddress = "";
     }
 
 public:
-    Host(const std::string& name, const std::string& ipAddress, const std::string& networkMask, const std::string& defaultGateway)
+    Host(const std::string& name, const std::string& ipAddress, const std::string& networkMask, const std::string& macAddress)
     :
     m_name {name}, m_ipAddress {ipAddress},
-    m_networkMask {networkMask}, m_defaultGateway {defaultGateway}
+    m_networkMask {networkMask}, m_macAddress {macAddress}
     {}
 
-    Host() {
-        getDataFromCurrentHost();
+    Host(bool populate = false) {
+        if (populate) {
+            getDataFromCurrentHost();
+        }
     }
 
+    [[nodiscard]] std::string getName() const {
+        return m_name;
+    }
+
+    void setName(const std::string &m_name) {
+        this->m_name = m_name;
+    }
+
+    [[nodiscard]] std::string getIPAddress() const {
+        return m_ipAddress;
+    }
+
+    void setIPAddress(const std::string &m_ip_address) {
+        m_ipAddress = m_ip_address;
+    }
+
+    [[nodiscard]] std::string getNetworkMask() const {
+        return m_networkMask;
+    }
+
+    void setNetworkMask(const std::string &m_network_mask) {
+        m_networkMask = m_network_mask;
+    }
+
+    [[nodiscard]] std::string getMacAddress() const {
+        return m_macAddress;
+    }
+
+    void setMacAddress(const std::string &m_mac_address) {
+        m_macAddress = m_mac_address;
+    }
 
     void getDataFromCurrentHost(Int ipVersion = AF_INET, std::string name = "") {
 
+        clearAttributes();
         ifaddrs *interfaceAddresses {};
 
         Int result = getifaddrs(&interfaceAddresses);
@@ -73,8 +110,6 @@ public:
         }
 
         for (ifaddrs *ptrToInterface = interfaceAddresses; ptrToInterface != nullptr && !isObjectPopulated() ; ptrToInterface = ptrToInterface->ifa_next) {
-            std::cout << ptrToInterface->ifa_name << '\n';
-
             if (ptrToInterface->ifa_addr != nullptr && ptrToInterface->ifa_addr->sa_family == ipVersion && ptrToInterface->ifa_netmask != nullptr
                 && (ptrToInterface->ifa_flags & IFF_LOOPBACK) != IFF_LOOPBACK && (ptrToInterface->ifa_flags & IFF_UP) == IFF_UP) {
 
@@ -130,10 +165,5 @@ public:
             throw (GenericException("It was not possible to populate the data"));
         }
     }
-
-
 };
-
-
-
 #endif //SOCKS_HOST_H
