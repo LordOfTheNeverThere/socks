@@ -26,10 +26,11 @@ private:
     std::string m_ipAddress {};
     std::string m_networkMask {};
     std::string m_defaultGateway {};
+    std::string m_macAddress {};
 
 
     bool isObjectPopulated() const {
-        return !(m_name.empty() || m_ipAddress.empty() || m_networkMask.empty() || m_defaultGateway.empty());
+        return !(m_name.empty() || m_ipAddress.empty() || m_networkMask.empty() || m_defaultGateway.empty() || m_macAddress.empty());
     }
 
 public:
@@ -62,16 +63,13 @@ public:
 
                 std::string interfaceName = ptrToInterface->ifa_name;
                 std::string macAddress {Tools::macToString(reinterpret_cast<sockaddr_ll*>(ptrToInterface->ifa_addr))};
-                std::cout << macAddress << '\n';
                 macAddresses.insert(std::pair<std::string, std::string> (interfaceName, macAddress));
             }
         }
 
 
         if (macAddresses.size() == 1) {
-
-        } else {
-
+            name = macAddresses.begin()->first;
         }
 
         for (ifaddrs *ptrToInterface = interfaceAddresses; ptrToInterface != nullptr && !isObjectPopulated() ; ptrToInterface = ptrToInterface->ifa_next) {
@@ -82,50 +80,52 @@ public:
 
                 if (name.empty()) {
                     m_name = ptrToInterface->ifa_name;
-                } else if (std::strcmp(name.c_str(), ptrToInterface->ifa_name) != 0) {
+                } else if (std::strcmp(name.c_str(), ptrToInterface->ifa_name) == 0) {
+                    m_name = name;
+                } else {
                     continue;
                 }
+                m_macAddress = macAddresses.at(m_name);
 
-                // if (ipVersion == AF_INET) {
-                //     char ipAddress[INET_ADDRSTRLEN] {};
-                //
-                //     const char *ptrToResultIP = inet_ntop(
-                //         ipVersion, &reinterpret_cast<sockaddr_in *>(ptrToInterface->ifa_addr)->sin_addr, ipAddress,
-                //         sizeof(ipAddress));
-                //     if (ptrToResultIP == nullptr) {
-                //         continue;
-                //     }
-                //     m_ipAddress = ipAddress;
-                //
-                //     const char *ptrToResultMask = inet_ntop(ipVersion, &reinterpret_cast<sockaddr_in*>(ptrToInterface->ifa_netmask)->sin_addr, ipAddress, sizeof(ipAddress));
-                //     if (ptrToResultMask == nullptr) {
-                //         continue;
-                //     }
-                //     m_networkMask = ipAddress;
-                //
-                // } else if (ipVersion == AF_INET6) {
-                //
-                //     char ipAddress[INET6_ADDRSTRLEN] {};
-                //     const char *ptrToResultIP = inet_ntop(ipVersion, &reinterpret_cast<sockaddr_in6*>(ptrToInterface->ifa_addr)->sin6_addr, ipAddress, sizeof(ipAddress));
-                //     if (ptrToResultIP == nullptr) {
-                //         continue;
-                //     }
-                //     m_ipAddress = ipAddress;
-                //
-                //     const char *ptrToResultMask = inet_ntop(ipVersion, &reinterpret_cast<sockaddr_in6*>(ptrToInterface->ifa_netmask)->sin6_addr, ipAddress, sizeof(ipAddress));
-                //     if (ptrToResultMask == nullptr) {
-                //         continue;
-                //     }
-                //     m_networkMask = ipAddress;
-                // } else {
-                //
-                //     freeifaddrs(interfaceAddresses);
-                //     throw GenericException("The ip version supplied is not allowed, try AF_INET or AF_INET6");
-                // }
+                if (ipVersion == AF_INET) {
+                    char ipAddress[INET_ADDRSTRLEN] {};
+
+                    const char *ptrToResultIP = inet_ntop(
+                        ipVersion, &reinterpret_cast<sockaddr_in *>(ptrToInterface->ifa_addr)->sin_addr, ipAddress,
+                        sizeof(ipAddress));
+                    if (ptrToResultIP == nullptr) {
+                        continue;
+                    }
+                    m_ipAddress = ipAddress;
+
+                    const char *ptrToResultMask = inet_ntop(ipVersion, &reinterpret_cast<sockaddr_in*>(ptrToInterface->ifa_netmask)->sin_addr, ipAddress, sizeof(ipAddress));
+                    if (ptrToResultMask == nullptr) {
+                        continue;
+                    }
+                    m_networkMask = ipAddress;
+
+                } else if (ipVersion == AF_INET6) {
+
+                    char ipAddress[INET6_ADDRSTRLEN] {};
+                    const char *ptrToResultIP = inet_ntop(ipVersion, &reinterpret_cast<sockaddr_in6*>(ptrToInterface->ifa_addr)->sin6_addr, ipAddress, sizeof(ipAddress));
+                    if (ptrToResultIP == nullptr) {
+                        continue;
+                    }
+                    m_ipAddress = ipAddress;
+
+                    const char *ptrToResultMask = inet_ntop(ipVersion, &reinterpret_cast<sockaddr_in6*>(ptrToInterface->ifa_netmask)->sin6_addr, ipAddress, sizeof(ipAddress));
+                    if (ptrToResultMask == nullptr) {
+                        continue;
+                    }
+                    m_networkMask = ipAddress;
+                } else {
+
+                    freeifaddrs(interfaceAddresses);
+                    throw GenericException("The ip version supplied is not allowed, try AF_INET or AF_INET6");
+                }
             }
         }
         freeifaddrs(interfaceAddresses);
-
         if (!isObjectPopulated()) {
             throw (GenericException("It was not possible to populate the data"));
         }
