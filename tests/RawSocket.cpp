@@ -1,6 +1,7 @@
 #include "socks/RawSocket.h"
 #include <netinet/ip_icmp.h>
 #include "gtest/gtest.h"
+#include "socks/Host.h"
 
 
 TEST(Misc, checkingICMPChecksumCalculation) {
@@ -20,8 +21,8 @@ TEST(Misc, checkingICMPChecksumCalculation) {
 
 
 TEST(MethodChecking, sendPingReceivePing) {
-
-    std::string senderIP {"10.7.7.28"};
+    Host myMachine {true};
+    std::string senderIP {myMachine.getIPAddress()};
     std::string destinationIP {"8.8.8.8"};
 
     RawSocket socket {AF_INET, IPPROTO_ICMP};
@@ -51,7 +52,8 @@ TEST(MethodChecking, sendPingReceivePing) {
 
 TEST(MethodChecking, sendPingReceivePingWithIPHeader) {
 
-    std::string senderIP {"10.7.7.28"};
+    Host myMachine {true};
+    std::string senderIP {myMachine.getIPAddress()};
     std::string destinationIP {"10.7.7.1"};
 
     RawSocket socket {AF_INET, IPPROTO_ICMP};

@@ -1,14 +1,12 @@
-//
-// Created by miguel on 3/9/26.
-//
-
 #ifndef SOCKS_HOST_H
 #define SOCKS_HOST_H
+#include <algorithm>
 #include <cstring>
 #include <memory>
+#include <iostream>
+#include <fstream>
 #include <string>
 #include <ifaddrs.h>
-#include <iostream>
 #include <map>
 #include <system_error>
 #include <arpa/inet.h>
@@ -36,6 +34,29 @@ private:
         m_macAddress = "";
     }
 
+    std::string getOUI() {
+        return m_macAddress.substr(0, 6);
+    }
+
+    void populateNameFromVendor() {
+        std::ifstream ouiFile("../../resources/oui.txt");
+        std::string lineBuffer {};
+        std::string name {};
+        std::string oui {};
+
+        while (std::getline(ouiFile, lineBuffer)) {
+            oui = lineBuffer.substr(0,6);
+            if (oui == getOUI()) {
+                name = lineBuffer.substr(7);
+                break;
+            }
+        }
+        m_name = name;
+        if (name.empty()) {
+            m_name = "Unknown Vendor";
+        }
+    }
+
 public:
     Host(const std::string& name, const std::string& ipAddress, const std::string& networkMask, const std::string& macAddress)
     :
@@ -51,10 +72,6 @@ public:
 
     [[nodiscard]] std::string getName() const {
         return m_name;
-    }
-
-    void setName(const std::string &m_name) {
-        this->m_name = m_name;
     }
 
     [[nodiscard]] std::string getIPAddress() const {
@@ -78,7 +95,12 @@ public:
     }
 
     void setMacAddress(const std::string &m_mac_address) {
+        if (m_mac_address.size() != 12) {
+            throw GenericException("Mac addresses must be 12 characters long");
+        }
         m_macAddress = m_mac_address;
+        std::transform(m_macAddress.begin(), m_macAddress.end(), m_macAddress.begin(), ::toupper);
+        populateNameFromVendor();
     }
 
     void getDataFromCurrentHost(Int ipVersion = AF_INET, std::string name = "") {
@@ -93,7 +115,6 @@ public:
         }
         std::map<std::string, std::string> macAddresses {};
 
-
         for (ifaddrs *ptrToInterface = interfaceAddresses; ptrToInterface != nullptr; ptrToInterface = ptrToInterface->ifa_next) {
             if (ptrToInterface->ifa_addr !=nullptr && (ptrToInterface->ifa_flags & IFF_LOOPBACK) != IFF_LOOPBACK && (ptrToInterface->ifa_flags & IFF_UP) == IFF_UP
             && ptrToInterface->ifa_addr->sa_family == AF_PACKET && (name.empty() || strcmp(name.c_str(), ptrToInterface->ifa_name) == 0)) {
@@ -104,7 +125,6 @@ public:
             }
         }
 
-
         if (macAddresses.size() == 1) {
             name = macAddresses.begin()->first;
         }
@@ -114,13 +134,12 @@ public:
                 && (ptrToInterface->ifa_flags & IFF_LOOPBACK) != IFF_LOOPBACK && (ptrToInterface->ifa_flags & IFF_UP) == IFF_UP) {
 
                 if (name.empty()) {
-                    m_name = ptrToInterface->ifa_name;
-                } else if (std::strcmp(name.c_str(), ptrToInterface->ifa_name) == 0) {
-                    m_name = name;
-                } else {
+                    setMacAddress(macAddresses.at(ptrToInterface->ifa_name));
+                } else if (std::strcmp(name.c_str(), ptrToInterface->ifa_name) != 0) {
                     continue;
+                } else {
+                    setMacAddress(macAddresses.at(name));
                 }
-                m_macAddress = macAddresses.at(m_name);
 
                 if (ipVersion == AF_INET) {
                     char ipAddress[INET_ADDRSTRLEN] {};
