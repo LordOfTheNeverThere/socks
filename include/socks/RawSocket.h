@@ -200,8 +200,8 @@ public:
         IPv4ToMACARPHeader arpHeader {};
         arpHeader.arpOperationCode = htons(ARPOP_REQUEST); // type of ARP Packet
         std::memcpy(arpHeader.srcMAC, srcMACAddr.data(), 6);
-        arpHeader.srcIPv4 = htonl(srcIPAddress);
-        arpHeader.dstIPv4 = htonl(dstIPAddress);
+        arpHeader.srcIPv4 = srcIPAddress;
+        arpHeader.dstIPv4 = dstIPAddress;
 
         //Payload
     }
