@@ -6,8 +6,9 @@
 #define SOCKS_TOOLS_H
 #include <iomanip>
 #include <sstream>
+#include <array>
 #include <netpacket/packet.h>
-
+#include "GenericException.h"
 #include "types.h"
 
 class Tools {
@@ -47,6 +48,37 @@ class Tools {
         }
 
         return oss.str();
+    }
+
+    static uint8_t hexToUInt8(const char& hexDigit) {
+        if (hexDigit >= '0' && hexDigit <= '9') {
+            return hexDigit - '0';
+        } else if (hexDigit >= 'a' && hexDigit <= 'f') {
+            return hexDigit - 'a' + 10;
+        } else if (hexDigit >= 'A' && hexDigit <= 'F') {
+            return hexDigit - 'A' + 10;
+        } else {
+            std::string hexDigitInString {hexDigit};
+            throw GenericException("Unknown Hexadecimal digit " + hexDigitInString);
+        }
+    }
+
+    static uint8_t fromHexByteStringToUInt8(const std::string& hexByte) {
+        if (hexByte.size() != 2) {
+            throw GenericException("cannot convert an hexadecimal string " + hexByte + " to uint8_t since it is " + std::to_string(hexByte.size()) + " characters long");
+        }
+        return (hexToUInt8(hexByte[0]) << 4) + hexToUInt8(hexByte[1]);
+    }
+
+    static std::array<uint8_t, 6> stringToMac(const std::string& macAddress) {
+        if (macAddress.size() != 12) {
+            throw GenericException("The stringToMac utility function only allows strings with 12 characters. So no other delimiter characters are allowed");
+        }
+        std::array<uint8_t, 6> result {};
+        for (Int i = 0; i < macAddress.size(); i = i + 2) {
+            result[i/2] = fromHexByteStringToUInt8(macAddress.substr(i, 2));
+        }
+        return result;
     }
 };
 

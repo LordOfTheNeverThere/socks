@@ -4,6 +4,7 @@
 
 #ifndef SOCKS_RAWSOCKET_H
 #define SOCKS_RAWSOCKET_H
+#include <array>
 #include <system_error>
 #include <unistd.h>
 #include <chrono>
@@ -13,6 +14,7 @@
 #include "RawSocketException.h"
 #include "Socket.h"
 #include <netinet/ip_icmp.h>
+#include <net/ethernet.h>
 
 #include "IPv4Header.h"
 #include "Tools.h"
@@ -27,7 +29,7 @@ private:
 public:
     RawSocket(const Int& ipVersion, const Int& protocol) :  m_protocol(protocol) {
 
-        if (ipVersion != AF_INET && ipVersion != AF_INET6) {
+        if (ipVersion != AF_INET && ipVersion != AF_INET6 && ipVersion != AF_PACKET) {
             throw RawSocketException("The family type with ID: " + std::to_string(ipVersion) + " is not supported.");
         } else {
             m_ipVersion = ipVersion;
@@ -175,6 +177,23 @@ public:
             }
         }
 
+    }
+
+    void sendArpEchoRequest(const std::string& destIPAddress, const std::string& senderMacAddress) {
+        if (m_ipVersion != AF_PACKET) {
+            throw RawSocketException("This socket needs the ipVersion == AF_PACKET to handle layer two traffic");
+        }
+
+        ether_header ethernetHeader {};
+        std::array<uint8_t,6> broadcastMacAddress {std::numeric_limits<uint8_t>::max()};
+        //loadEthernetHeader(&ethernetHeader, broadcastMacAddress, Tools::stringToMac(senderMacAddress), ETHERTYPE_ARP)
+
+    }
+
+    void receiveArpEchoReply() {
+        if (m_ipVersion != AF_PACKET) {
+           throw RawSocketException("This socket needs the ipVersion == AF_PACKET to handle layer two traffic");
+        }
     }
 
 };
