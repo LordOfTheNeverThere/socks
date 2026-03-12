@@ -27,6 +27,7 @@ add_executable(socks_dev
         include/socks/Socket.h
         include/socks/IPv4Header.h
         include/socks/Host.h
+        include/socks/IPv4ToMACARPHeader.h
 )
 
 target_link_libraries(socks_dev PRIVATE socks)

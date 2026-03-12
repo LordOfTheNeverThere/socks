@@ -15,9 +15,11 @@
 #include "Socket.h"
 #include <netinet/ip_icmp.h>
 #include <net/ethernet.h>
+#include <net/if_arp.h>
 
 #include "IPv4Header.h"
 #include "Tools.h"
+#include "IPv4ToMACARPHeader.h"
 
 
 class RawSocket : private Socket {
@@ -47,6 +49,7 @@ public:
             m_ipHeader = ipHeader;
             Int one = 1;
             Int socketOpt = setsockopt(m_socket,IPPROTO_IP,IP_HDRINCL, &one, sizeof(one));
+            m_ipVersion = AF_INET;
             if (socketOpt == -1) {
                 throw RawSocketException("The setting of the socket option IP_HDRINCL failed.\nReason:\n" + std::system_category().message(errno));
             }
@@ -95,10 +98,14 @@ public:
         sockaddr_storage destination {};
         destination.ss_family = m_ipVersion;
 
+        Int conversionResult {};
         if (m_ipVersion == AF_INET) {
-            inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in*>(&destination)->sin_addr));
+            conversionResult = inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in*>(&destination)->sin_addr));
         } else if (m_ipVersion == AF_INET6) {
-            inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in6*>(&destination)->sin6_addr));
+            conversionResult = inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in6*>(&destination)->sin6_addr));
+        }
+        if (conversionResult != 1) {
+            throw RawSocketException("It was not possible to convert the destination address " + destIP + " into its binary form \nReason:\n " + std::system_category().message(errno));
         }
 
         const size_t headerSize = sizeof(icmphdr); //use icmphdr instead of icmp for requests, icmp has part of the IP header which caused the host to reply with an error, since this is request it is nonsensical to include it here
@@ -179,14 +186,46 @@ public:
 
     }
 
-    void sendArpEchoRequest(const std::string& destIPAddress, const std::string& senderMacAddress) {
+    static void constructARPEchoRequestPacket(uint8_t* packet, uint32_t& dstIPAddress, uint32_t& srcIPAddress, const std::string& srcMacAddressString) {
+        ether_header ethernetHeader {};
+
+        std::array<uint8_t,6> dstMACAddr {std::numeric_limits<uint8_t>::max()};
+        std::array<uint8_t,6> srcMACAddr = Tools::stringToMac(srcMacAddressString);
+
+        std::memcpy(ethernetHeader.ether_dhost, dstMACAddr.data(), 6);
+        std::memcpy(ethernetHeader.ether_shost, srcMACAddr.data(), 6);
+        ethernetHeader.ether_type = htons(ETHERTYPE_ARP);
+
+
+        IPv4ToMACARPHeader arpHeader {};
+        arpHeader.arpOperationCode = htons(ARPOP_REQUEST); // type of ARP Packet
+        std::memcpy(arpHeader.srcMAC, srcMACAddr.data(), 6);
+        arpHeader.srcIPv4 = htonl(srcIPAddress);
+        arpHeader.dstIPv4 = htonl(dstIPAddress);
+
+        //Payload
+    }
+
+    void sendArpEchoRequest(const std::string& dstIPAddress, const std::string& srcMacAddress, const std::string& srcIPAddress) {
         if (m_ipVersion != AF_PACKET) {
             throw RawSocketException("This socket needs the ipVersion == AF_PACKET to handle layer two traffic");
         }
+        if (dstIPAddress.size() > 15 || dstIPAddress.size() < 7) {
+            throw RawSocketException("The Destination IP address " + dstIPAddress + " is not in an IPv4 format");
+        }
+        uint32_t dstIPAddressNum {};
+        uint32_t srcIPAddressNum {};
+        Int conversionResult = inet_pton(AF_INET, dstIPAddress.c_str(), &dstIPAddressNum);
+        if (conversionResult != 1) {
+            throw RawSocketException("It was not possible to convert the destination address " + dstIPAddress + " into its binary form \nReason:\n " + std::system_category().message(errno));
+        }
+        conversionResult = inet_pton(AF_INET, srcIPAddress.c_str(), &srcIPAddressNum);
+        if (conversionResult != 1) {
+            throw RawSocketException("It was not possible to convert the source address " + srcIPAddress + " into its binary form \nReason:\n " + std::system_category().message(errno));
+        }
 
-        ether_header ethernetHeader {};
-        std::array<uint8_t,6> broadcastMacAddress {std::numeric_limits<uint8_t>::max()};
-        //loadEthernetHeader(&ethernetHeader, broadcastMacAddress, Tools::stringToMac(senderMacAddress), ETHERTYPE_ARP)
+        uint8_t packet[sizeof(ether_header) + sizeof(IPv4ToMACARPHeader) + 8];
+        constructARPEchoRequestPacket(packet, dstIPAddressNum, srcIPAddressNum, srcMacAddress);
 
     }
 
