@@ -11,12 +11,19 @@ class LocalHost : public Host{
 private:
     std::string m_interfaceName {"Unknown"};
 public:
-    LocalHost(bool populate = false) {
+    LocalHost(bool populate = false) : Host() {
         if (populate) {
             getDataFromCurrentHost();
         }
     }
 
+    std::string getInterfaceName() {
+        return m_interfaceName;
+    }
+
+    void setInterfaceName(const std::string &name) {
+        m_interfaceName = name;
+    }
 
     void getDataFromCurrentHost(Int ipVersion = AF_INET, std::string name = "") {
 
@@ -52,7 +59,7 @@ public:
                     continue;
                 } else {
                     setMacAddress(macAddresses.at(ptrToInterface->ifa_name));
-                    m_interfaceName = ptrToInterface->ifa_name;
+                    setInterfaceName(ptrToInterface->ifa_name);
                 }
 
                 if (ipVersion == AF_INET) {

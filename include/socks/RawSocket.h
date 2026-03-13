@@ -206,7 +206,7 @@ public:
         std::memcpy(packet, &ethernetHeader, sizeof(ether_header));
         std::memcpy(packet + sizeof(ether_header), &arpPacket, sizeof(arpPacket));
 
-        return sizeof(packet);
+        return sizeof(ether_header) + sizeof(IPv4ToMACARPPacket);
     }
 
     size_t sendArpEchoRequest(const std::string& dstIPAddress, const std::string& srcMacAddress, const std::string& srcIPAddress, const std::string& srcInterfaceName) {
@@ -233,13 +233,12 @@ public:
 
         sockaddr_ll destination {};
         destination.sll_family = AF_PACKET;
-        destination.sll_protocol = htons(ETH_P_IP);
+        destination.sll_protocol = htons(ETH_P_ARP);
         const uint32_t interfaceIndex = if_nametoindex(srcInterfaceName.c_str());
         if (interfaceIndex == 0) {
             throw RawSocketException("The interface name \"" + srcInterfaceName + "\" could not be found\nReason:\n" + std::system_category().message(errno));
         }
         destination.sll_ifindex = interfaceIndex;
-        destination.sll_pkttype = PACKET_BROADCAST;
         std::memcpy(destination.sll_addr, dstMACAddrBytes.data(), sizeof(dstMACAddrBytes));
         destination.sll_halen = sizeof(dstMACAddrBytes);
 
@@ -256,10 +255,47 @@ public:
         return sent;
     }
 
-    void receiveArpEchoReply() {
+    void receiveArpEchoReply(uint8_t recvBuffer[ETH_FRAME_LEN], const std::string originIP = "") {
         if (m_ipVersion != AF_PACKET) {
            throw RawSocketException("This socket needs the ipVersion == AF_PACKET to handle layer two traffic");
         }
+        sockaddr_ll origin {};
+        socklen_t originAddrLen = sizeof(origin);
+
+        int64_t numBytesRecv {0};
+
+        if (originIP.empty()) {
+            numBytesRecv = recvfrom(m_socket, recvBuffer, ETH_FRAME_LEN, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
+
+            if (numBytesRecv == -1) {
+                throw RawSocketException("The socket was not able to read the incoming arp echo reply: \n Reason: \n " + std::system_category().message(errno));
+            }
+        } else {
+            bool isOriginCorrect = false;
+
+            while (!isOriginCorrect) {
+
+                numBytesRecv = recvfrom(m_socket, recvBuffer, ETH_FRAME_LEN, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
+                if (numBytesRecv == -1) {
+                    throw RawSocketException("The socket was not able to read the incoming arp echo reply: \n Reason: \n " + std::system_category().message(errno));
+                }
+
+                IPv4ToMACARPPacket arpResponse {};
+                std::memcpy(&arpResponse, recvBuffer + sizeof(ether_header), sizeof(IPv4ToMACARPPacket));
+                char srcIPAddress[INET_ADDRSTRLEN] {};
+                const char* convResult = inet_ntop(AF_INET, &arpResponse.srcIPv4, srcIPAddress,INET_ADDRSTRLEN);
+
+                if (convResult == nullptr) {
+                    throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
+                }
+
+                isOriginCorrect = (strcmp(originIP.c_str(), srcIPAddress) == 0);
+            }
+
+        }
+
+
+
     }
 
 };

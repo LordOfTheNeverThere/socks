@@ -1,11 +1,11 @@
 
 
-#include "socks/Host.h"
 #include "gtest/gtest.h"
+#include "socks/LocalHost.h"
 
 
 TEST(MethodChecking, PopulateObject) {
-    Host myMachine {true};
+    LocalHost myMachine {true};
     EXPECT_NE("", myMachine.getName());
     EXPECT_NE("", myMachine.getIPAddress());
     EXPECT_NE("", myMachine.getNetworkMask());
@@ -13,7 +13,7 @@ TEST(MethodChecking, PopulateObject) {
 }
 
 TEST(MethodChecking, doNotPopulateObject) {
-    Host myMachine {false};
+    LocalHost myMachine {false};
     EXPECT_EQ("", myMachine.getName());
     EXPECT_EQ("", myMachine.getIPAddress());
     EXPECT_EQ("", myMachine.getNetworkMask());
@@ -21,7 +21,7 @@ TEST(MethodChecking, doNotPopulateObject) {
 }
 
 TEST(MethodChecking, selectNonExistentName) {
-    Host myMachine {false};
+    LocalHost myMachine {false};
     EXPECT_THROW(try {
         myMachine.getDataFromCurrentHost(2, "This Interface Name will never exit!");
     } catch (GenericException ge) {

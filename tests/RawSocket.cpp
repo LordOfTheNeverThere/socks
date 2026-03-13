@@ -1,7 +1,7 @@
 #include "socks/RawSocket.h"
 #include <netinet/ip_icmp.h>
 #include "gtest/gtest.h"
-#include "socks/Host.h"
+#include "socks/LocalHost.h"
 
 
 TEST(Misc, checkingICMPChecksumCalculation) {
@@ -21,7 +21,7 @@ TEST(Misc, checkingICMPChecksumCalculation) {
 
 
 TEST(MethodChecking, sendPingReceivePing) {
-    Host myMachine {true};
+    LocalHost myMachine {true};
     std::string senderIP {myMachine.getIPAddress()};
     std::string destinationIP {"8.8.8.8"};
 
@@ -52,9 +52,9 @@ TEST(MethodChecking, sendPingReceivePing) {
 
 TEST(MethodChecking, sendPingReceivePingWithIPHeader) {
 
-    Host myMachine {true};
+    LocalHost myMachine {true};
     std::string senderIP {myMachine.getIPAddress()};
-    std::string destinationIP {"10.7.7.1"};
+    std::string destinationIP {"8.8.8.8"};
 
     RawSocket socket {AF_INET, IPPROTO_ICMP};
     uint8_t ipHeaderSendBuffer[sizeof(ip)] {};
@@ -81,4 +81,50 @@ TEST(MethodChecking, sendPingReceivePingWithIPHeader) {
 
     EXPECT_EQ(senderIP, ipHeaderReceive.getDestStr());
     EXPECT_EQ(destinationIP, ipHeaderReceive.getSourceStr());
+}
+
+TEST(MethodChecking, sendReceiveARPPing) {
+    LocalHost myMachine {true};
+
+    std::string senderIP {myMachine.getIPAddress()};
+    std::string senderMAC {myMachine.getMacAddress()};
+    std::string interfaceName {myMachine.getInterfaceName()};
+    std::string destinationIP {"10.7.7.1"};
+
+    RawSocket socket {AF_PACKET, htons(ETH_P_ARP)};
+    socket.sendArpEchoRequest(destinationIP, senderMAC, senderIP, interfaceName);
+
+    uint8_t recvBuffer[ETH_FRAME_LEN] {};
+    socket.receiveArpEchoReply(recvBuffer);
+
+    IPv4ToMACARPPacket arpResponse {};
+    std::memcpy(&arpResponse, recvBuffer + sizeof(ether_header), sizeof(IPv4ToMACARPPacket));
+    char srcIPAddressThatWasReceived[INET_ADDRSTRLEN] {};
+    inet_ntop(AF_INET, &arpResponse.srcIPv4, srcIPAddressThatWasReceived,INET_ADDRSTRLEN);
+
+    EXPECT_TRUE(strcmp(srcIPAddressThatWasReceived, destinationIP.c_str()) == 0);
+}
+
+
+
+TEST(MethodChecking, sendReceiveARPPingWithIPQuery) {
+    LocalHost myMachine {true};
+
+    std::string senderIP {myMachine.getIPAddress()};
+    std::string senderMAC {myMachine.getMacAddress()};
+    std::string interfaceName {myMachine.getInterfaceName()};
+    std::string destinationIP {"10.7.7.1"};
+
+    RawSocket socket {AF_PACKET, htons(ETH_P_ARP)};
+    socket.sendArpEchoRequest(destinationIP, senderMAC, senderIP, interfaceName);
+
+    uint8_t recvBuffer[ETH_FRAME_LEN] {};
+    socket.receiveArpEchoReply(recvBuffer, destinationIP);
+
+    IPv4ToMACARPPacket arpResponse {};
+    std::memcpy(&arpResponse, recvBuffer + sizeof(ether_header), sizeof(IPv4ToMACARPPacket));
+    char srcIPAddressThatWasReceived[INET_ADDRSTRLEN] {};
+    inet_ntop(AF_INET, &arpResponse.srcIPv4, srcIPAddressThatWasReceived,INET_ADDRSTRLEN);
+
+    EXPECT_TRUE(strcmp(srcIPAddressThatWasReceived, destinationIP.c_str()) == 0);
 }

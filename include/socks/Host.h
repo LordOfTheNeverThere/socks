@@ -66,6 +66,8 @@ public:
     m_networkMask {networkMask}, m_macAddress {macAddress}
     {}
 
+    Host()=default;
+
     [[nodiscard]] std::string getName() const {
         return m_name;
     }
