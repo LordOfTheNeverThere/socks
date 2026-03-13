@@ -6,7 +6,7 @@
 #include <netinet/in.h>
 
 #define ARPFIXEDHEADERSIZE 8; // Size of the header that is fixed regardless of layer 3 or 2 addressing
-struct __attribute__((packed)) IPv4ToMACARPHeader {
+struct __attribute__((packed)) IPv4ToMACARPPacket { // Contains the Fixed Header plus the payload for IPv4 to MAC
 
     uint16_t hardAddrFormat = htons(ARPHRD_ETHER);;		// Format of hardware address.  (Default ARPHRD_ETHER)
     uint16_t protoAddrFormat = htons(ETH_P_IP);		// Format of protocol address.  (Default ETH_P_IP)
@@ -20,5 +20,5 @@ struct __attribute__((packed)) IPv4ToMACARPHeader {
     uint32_t dstIPv4;                 // Target Protocol Address (IPv4)
 };
 
-static_assert(sizeof(IPv4ToMACARPHeader) == 28, "Padding detected in IPv4ARPHeader!");
+static_assert(sizeof(IPv4ToMACARPPacket) == 28, "Padding detected in IPv4ARPHeader!");
 #endif //SOCKS_IPV4TOMACARPHEADER_H

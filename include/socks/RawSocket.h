@@ -19,7 +19,8 @@
 
 #include "IPv4Header.h"
 #include "Tools.h"
-#include "IPv4ToMACARPHeader.h"
+#include "IPv4ToMACARPPacket.h"
+#include "LocalHost.h"
 
 
 class RawSocket : private Socket {
@@ -186,27 +187,29 @@ public:
 
     }
 
-    static void constructARPEchoRequestPacket(uint8_t* packet, uint32_t& dstIPAddress, uint32_t& srcIPAddress, const std::string& srcMacAddressString) {
+    static size_t constructARPEchoRequestPacket(uint8_t* packet, const uint32_t& dstIPAddress,
+        const uint32_t& srcIPAddress, const std::array<uint8_t,6>& dstMacAddress, const std::array<uint8_t,6>& srcMacAddress) {
+
         ether_header ethernetHeader {};
-
-        std::array<uint8_t,6> dstMACAddr {std::numeric_limits<uint8_t>::max()};
-        std::array<uint8_t,6> srcMACAddr = Tools::stringToMac(srcMacAddressString);
-
-        std::memcpy(ethernetHeader.ether_dhost, dstMACAddr.data(), 6);
-        std::memcpy(ethernetHeader.ether_shost, srcMACAddr.data(), 6);
+        std::memcpy(ethernetHeader.ether_dhost, dstMacAddress.data(), 6);
+        std::memcpy(ethernetHeader.ether_shost, srcMacAddress.data(), 6);
         ethernetHeader.ether_type = htons(ETHERTYPE_ARP);
 
 
-        IPv4ToMACARPHeader arpHeader {};
-        arpHeader.arpOperationCode = htons(ARPOP_REQUEST); // type of ARP Packet
-        std::memcpy(arpHeader.srcMAC, srcMACAddr.data(), 6);
-        arpHeader.srcIPv4 = srcIPAddress;
-        arpHeader.dstIPv4 = dstIPAddress;
+        IPv4ToMACARPPacket arpPacket {};
+        arpPacket.arpOperationCode = htons(ARPOP_REQUEST); // type of ARP Packet
+        std::memcpy(arpPacket.srcMAC, srcMacAddress.data(), 6);
+        arpPacket.srcIPv4 = srcIPAddress;
+        arpPacket.dstIPv4 = dstIPAddress;
 
-        //Payload
+        //populate the packet
+        std::memcpy(packet, &ethernetHeader, sizeof(ether_header));
+        std::memcpy(packet + sizeof(ether_header), &arpPacket, sizeof(arpPacket));
+
+        return sizeof(packet);
     }
 
-    void sendArpEchoRequest(const std::string& dstIPAddress, const std::string& srcMacAddress, const std::string& srcIPAddress) {
+    size_t sendArpEchoRequest(const std::string& dstIPAddress, const std::string& srcMacAddress, const std::string& srcIPAddress, const std::string& srcInterfaceName) {
         if (m_ipVersion != AF_PACKET) {
             throw RawSocketException("This socket needs the ipVersion == AF_PACKET to handle layer two traffic");
         }
@@ -224,9 +227,33 @@ public:
             throw RawSocketException("It was not possible to convert the source address " + srcIPAddress + " into its binary form \nReason:\n " + std::system_category().message(errno));
         }
 
-        uint8_t packet[sizeof(ether_header) + sizeof(IPv4ToMACARPHeader) + 8];
-        constructARPEchoRequestPacket(packet, dstIPAddressNum, srcIPAddressNum, srcMacAddress);
+        std::array<uint8_t,6> dstMACAddrBytes {};
+        dstMACAddrBytes.fill(std::numeric_limits<uint8_t>::max());
+        std::array<uint8_t,6> srcMACAddrBytes = Tools::stringToMac(srcMacAddress);
 
+        sockaddr_ll destination {};
+        destination.sll_family = AF_PACKET;
+        destination.sll_protocol = htons(ETH_P_IP);
+        const uint32_t interfaceIndex = if_nametoindex(srcInterfaceName.c_str());
+        if (interfaceIndex == 0) {
+            throw RawSocketException("The interface name \"" + srcInterfaceName + "\" could not be found\nReason:\n" + std::system_category().message(errno));
+        }
+        destination.sll_ifindex = interfaceIndex;
+        destination.sll_pkttype = PACKET_BROADCAST;
+        std::memcpy(destination.sll_addr, dstMACAddrBytes.data(), sizeof(dstMACAddrBytes));
+        destination.sll_halen = sizeof(dstMACAddrBytes);
+
+
+        uint8_t packet[sizeof(ether_header) + sizeof(IPv4ToMACARPPacket)];
+        size_t bytesToSend = constructARPEchoRequestPacket(packet, dstIPAddressNum, srcIPAddressNum, dstMACAddrBytes, srcMACAddrBytes);
+        size_t sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+
+        if (sent == -1) {
+            throw RawSocketException("ARP Echo Request to " + dstIPAddress + " failed. \n Reason: \n" + std::system_category().message(errno));
+        } else if (sent != bytesToSend) {
+            throw RawSocketException("Not all of the packet was sent.\n Packet size: " + std::to_string(bytesToSend) + "\nSent: " + std::to_string(sent));
+        }
+        return sent;
     }
 
     void receiveArpEchoReply() {
