@@ -14,10 +14,10 @@ struct __attribute__((packed)) IPv4ToMACARPPacket { // Contains the Fixed Header
     uint8_t protoAddrLength = 4;		// Length of protocol address.  (Default 4)
     uint16_t arpOperationCode;		                // ARP opcode (command).  */
 
-    uint8_t srcMAC[6];               // Sender Hardware Address (MAC)
-    uint32_t srcIPv4;                 // Sender Protocol Address (IPv4)
-    uint8_t dstMAC[6];               // Target Hardware Address (MAC) (Ignored in ARP Echo Request)
-    uint32_t dstIPv4;                 // Target Protocol Address (IPv4)
+    uint8_t srcMAC[ETH_ALEN];      // Sender Hardware Address (MAC)
+    uint32_t srcIPv4;              // Sender Protocol Address (IPv4)
+    uint8_t dstMAC[ETH_ALEN];      // Target Hardware Address (MAC) (Ignored in ARP Echo Request)
+    uint32_t dstIPv4;              // Target Protocol Address (IPv4)
 };
 
 static_assert(sizeof(IPv4ToMACARPPacket) == 28, "Padding detected in IPv4ARPHeader!");

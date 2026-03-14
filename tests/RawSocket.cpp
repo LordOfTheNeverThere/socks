@@ -66,7 +66,7 @@ TEST(MethodChecking, sendPingReceivePingWithIPHeader) {
     socket.receivePing(packet);
 
     uint64_t nanosecs {};
-    memcpy( &nanosecs,packet + sizeof(icmp), sizeof(uint64_t));
+    std::memcpy( &nanosecs,packet + sizeof(icmp), sizeof(uint64_t));
     nanosecs = be64toh(nanosecs);
     uint64_t currNanosecs = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now()).time_since_epoch().count();
     EXPECT_TRUE(currNanosecs - nanosecs < 5000000000); // There was at most a 5 second gap between the time the request was sent and the reply fetched
@@ -74,7 +74,7 @@ TEST(MethodChecking, sendPingReceivePingWithIPHeader) {
 
 
     uint8_t ipHeaderReceiveBuffer[sizeof(ip)] {};
-    memcpy(&ipHeaderReceiveBuffer,packet, sizeof(ip));
+    std::memcpy(&ipHeaderReceiveBuffer,packet, sizeof(ip));
     // The IP header is the first element of the packet +  then ICMP header  + Payload. If this was an ICMP error it would be
     // [IP Header] + [ICMP Header] + [Your Original IP Header] + [Your Original ICMP Header] + [Payload]
     IPv4Header ipHeaderReceive {IPv4Header(ipHeaderReceiveBuffer)};
@@ -89,7 +89,7 @@ TEST(MethodChecking, sendReceiveARPPing) {
     std::string senderIP {myMachine.getIPAddress()};
     std::string senderMAC {myMachine.getMacAddress()};
     std::string interfaceName {myMachine.getInterfaceName()};
-    std::string destinationIP {"10.7.7.1"};
+    std::string destinationIP {"192.168.1.1"};
 
     RawSocket socket {AF_PACKET, htons(ETH_P_ARP)};
     socket.sendArpEchoRequest(destinationIP, senderMAC, senderIP, interfaceName);
@@ -113,7 +113,7 @@ TEST(MethodChecking, sendReceiveARPPingWithIPQuery) {
     std::string senderIP {myMachine.getIPAddress()};
     std::string senderMAC {myMachine.getMacAddress()};
     std::string interfaceName {myMachine.getInterfaceName()};
-    std::string destinationIP {"10.7.7.1"};
+    std::string destinationIP {"192.168.1.1"};
 
     RawSocket socket {AF_PACKET, htons(ETH_P_ARP)};
     socket.sendArpEchoRequest(destinationIP, senderMAC, senderIP, interfaceName);

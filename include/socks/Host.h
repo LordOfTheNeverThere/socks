@@ -100,5 +100,12 @@ public:
         std::transform(m_macAddress.begin(), m_macAddress.end(), m_macAddress.begin(), ::toupper);
         populateNameFromVendor();
     }
+
+
+
+    void populateFromARPEchoReply(uint8_t* reply) {
+
+
+    }
 };
 #endif //SOCKS_HOST_H

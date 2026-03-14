@@ -280,6 +280,9 @@ public:
                     throw RawSocketException("The socket was not able to read the incoming arp echo reply: \n Reason: \n " + std::system_category().message(errno));
                 }
 
+                ether_header ethernetHeaderResponse {};
+                std::memcpy(&ethernetHeaderResponse, recvBuffer, sizeof(ether_header));
+
                 IPv4ToMACARPPacket arpResponse {};
                 std::memcpy(&arpResponse, recvBuffer + sizeof(ether_header), sizeof(IPv4ToMACARPPacket));
                 char srcIPAddress[INET_ADDRSTRLEN] {};
@@ -289,9 +292,11 @@ public:
                     throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
                 }
 
-                isOriginCorrect = (strcmp(originIP.c_str(), srcIPAddress) == 0);
+                if (std::equal(std::begin(ethernetHeaderResponse.ether_shost), std::end(ethernetHeaderResponse.ether_shost), std::begin(arpResponse.srcMAC))) {
+                    // protection against packet tempering
+                    isOriginCorrect = (strcmp(originIP.c_str(), srcIPAddress) == 0);
+                }
             }
-
         }
 
 
