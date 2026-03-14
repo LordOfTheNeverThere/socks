@@ -10,9 +10,12 @@
 #include <map>
 #include <system_error>
 #include <arpa/inet.h>
+#include <net/ethernet.h>
 #include <netpacket/packet.h>
 #include <net/if.h>
 
+#include "HostException.h"
+#include "IPv4ToMACARPPacket.h"
 #include "NameResolutionException.h"
 #include "Tools.h"
 #include "types.h"
@@ -103,7 +106,20 @@ public:
 
 
 
-    void populateFromARPEchoReply(uint8_t* reply) {
+    void populateFromARPEchoReply(const uint8_t* reply, const std::string& ipString = "") {
+
+        IPv4ToMACARPPacket arpResponse {};
+        std::memcpy(&arpResponse, reply + sizeof(ether_header), sizeof(IPv4ToMACARPPacket));
+
+        if (ipString.empty()) {
+            char srcIPAddress[INET_ADDRSTRLEN] {};
+            const char* convResult = inet_ntop(AF_INET, &arpResponse.srcIPv4, srcIPAddress,INET_ADDRSTRLEN);
+            if (convResult == nullptr) {
+                throw HostException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
+            }
+            setIPAddress(srcIPAddress);
+        }
+
 
 
     }

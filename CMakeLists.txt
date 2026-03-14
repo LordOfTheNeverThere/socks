@@ -29,6 +29,7 @@ add_executable(socks_dev
         include/socks/Host.h
         include/socks/IPv4ToMACARPPacket.h
         include/socks/LocalHost.h
+        include/socks/HostException.h
 )
 
 target_link_libraries(socks_dev PRIVATE socks)
