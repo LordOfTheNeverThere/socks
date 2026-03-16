@@ -6,7 +6,12 @@
 #define SOCKS_TOOLS_H
 #include <iomanip>
 #include <sstream>
+#include <fstream>
 #include <array>
+#include <arpa/inet.h>
+#include <bits/socket.h>
+#include <linux/if_ether.h>
+#include <netinet/in.h>
 #include <netpacket/packet.h>
 #include "GenericException.h"
 #include "types.h"
@@ -37,6 +42,15 @@ class Tools {
         return static_cast<uint16_t>(bucketSum);
     }
 
+    static std::string macToString(uint8_t macInBytes[ETH_ALEN]) {
+        std::ostringstream oss {};
+
+        for (int i = 0; i < ETH_ALEN; ++i) {
+            oss << std::hex << std::setw(2) << std::setfill('0')
+            << static_cast<int>(macInBytes[i]);
+        }
+        return  oss.str();
+    }
 
     static std::string macToString(struct sockaddr_ll *s) {
         std::ostringstream oss;
@@ -79,6 +93,43 @@ class Tools {
             result[i/2] = fromHexByteStringToUInt8(macAddress.substr(i, 2));
         }
         return result;
+    }
+
+
+    static std::string getDefaultGateway() { // Only For Linux and IPv4
+        std::ifstream routeFile("/proc/net/route");
+        if (!routeFile.is_open()) {
+            return "Error: Could not open /proc/net/route";
+        }
+
+        std::string line {};
+        // Skip the header line
+        std::getline(routeFile, line);
+
+        while (std::getline(routeFile, line)) {
+            std::stringstream ss(line);
+            std::string iface {};
+            std::string dest {};
+            std::string gateway {};
+            ss >> iface >> dest >> gateway;
+
+            if (dest == "00000000") {
+                uint32_t addr {};
+                std::stringstream converter {};
+                converter << std::hex << gateway;
+                converter >> addr;
+
+                in_addr in {};
+                in.s_addr = addr;
+
+                char ipStr[INET_ADDRSTRLEN];
+                if (inet_ntop(AF_INET, &in, ipStr, INET_ADDRSTRLEN)) {
+                    return std::string(ipStr);
+                }
+            }
+        }
+
+        return "No default gateway found";
     }
 };
 

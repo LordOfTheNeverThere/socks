@@ -2,6 +2,7 @@
 
 #include "gtest/gtest.h"
 #include "socks/LocalHost.h"
+#include "socks/RawSocket.h"
 
 
 TEST(MethodChecking, PopulateObject) {
@@ -28,4 +29,29 @@ TEST(MethodChecking, selectNonExistentName) {
         EXPECT_STREQ(ge.what(), "It was not possible to populate the data");
         throw;
     }, GenericException);
+}
+
+
+
+TEST(MethodChecking, PopulateHostFromARP) {
+
+    LocalHost myMachine {true};
+    std::string senderIP {myMachine.getIPAddress()};
+    std::string senderMAC {myMachine.getMacAddress()};
+    std::string interfaceName {myMachine.getInterfaceName()};
+    std::string destinationIP {Tools::getDefaultGateway()};
+
+    RawSocket socket {AF_PACKET, htons(ETH_P_ARP)};
+    socket.sendArpEchoRequest(destinationIP, senderMAC, senderIP, interfaceName);
+
+    uint8_t recvBuffer[ETH_FRAME_LEN] {};
+    socket.receiveArpEchoReply(recvBuffer);
+
+    Host externalHost {};
+    externalHost.populateFromARPEchoReply(recvBuffer);
+    std::cout << externalHost << '\n';
+
+    EXPECT_EQ(externalHost.getIPAddress(), destinationIP);
+    EXPECT_NE(externalHost.getName(), "");
+    EXPECT_NE(externalHost.getMacAddress(), "");
 }

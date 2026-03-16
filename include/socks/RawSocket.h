@@ -10,7 +10,8 @@
 #include <chrono>
 #include <cstring>
 #include <arpa/inet.h>
-
+#include <netpacket/packet.h>
+#include <net/if.h>
 #include "RawSocketException.h"
 #include "Socket.h"
 #include <netinet/ip_icmp.h>
@@ -279,7 +280,8 @@ public:
             // Anti Tampering and Packet Integrity Checks
             acceptPacket = (originIP.empty() || (!originIP.empty() && strcmp(originIP.c_str(), srcIPAddress) == 0))
             && std::equal(std::begin(ethernetHeaderResponse.ether_shost), std::end(ethernetHeaderResponse.ether_shost), std::begin(arpResponse.srcMAC))
-            && ntohs(ethernetHeaderResponse.ether_type) == ETHERTYPE_ARP && ntohs(arpResponse.arpOperationCode) == ARPOP_REPLY
+            && ntohs(ethernetHeaderResponse.ether_type) == ETHERTYPE_ARP
+            && ntohs(arpResponse.arpOperationCode) == ARPOP_REPLY
             && arpResponse.hardAddrLength == ETH_ALEN && arpResponse.protoAddrLength == 4
             && (ntohs(arpResponse.hardAddrFormat) == ARPHRD_ETHER) && (ntohs(arpResponse.protoAddrFormat) == ETH_P_IP)
             && origin.sll_pkttype == PACKET_HOST;

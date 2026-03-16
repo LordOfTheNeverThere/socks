@@ -13,12 +13,15 @@
 #include <net/ethernet.h>
 #include <netpacket/packet.h>
 #include <net/if.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
 
 #include "HostException.h"
+#include "IPv4Header.h"
 #include "IPv4ToMACARPPacket.h"
 #include "NameResolutionException.h"
 #include "Tools.h"
-#include "types.h"
+
 
 class Host {
     friend class LocalHost;
@@ -122,6 +125,15 @@ public:
 
         ether_header ethernetHeaderResponse {};
         std::memcpy(&ethernetHeaderResponse, reply, sizeof(ether_header));
+        setMacAddress(Tools::macToString(ethernetHeaderResponse.ether_shost));
     }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Host& host) {
+    os << "Name/MAC-Vendor: " << host.getName() << '\n' << "IP Address: " << host.getIPAddress() <<  '\n' << "MAC: " << host.getMacAddress() << '\n';
+    if (!host.getNetworkMask().empty()) {
+        os << host.getNetworkMask() << '\n';
+    }
+    return os;
+}
 #endif //SOCKS_HOST_H

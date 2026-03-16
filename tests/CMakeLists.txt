@@ -1,11 +1,12 @@
 add_executable(socksTests NetworkListener.cpp
         Tools.cpp
-        Host.cpp
 )
 
 
 add_executable(sudoSocksTests
-        RawSocket.cpp)
+        RawSocket.cpp
+        Host.cpp
+)
 
 
 target_link_libraries(socksTests
