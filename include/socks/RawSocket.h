@@ -134,57 +134,50 @@ public:
         return sent;
     }
 
-    void receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "") const {
+    void receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "", const Int& seqNum = 0) const {
         sockaddr_storage origin {};
         socklen_t originAddrLen = sizeof(origin);
 
-        int64_t numBytesRecv {0};
+        bool acceptPacket = false;
 
-        if (originIP.empty()) {
-            numBytesRecv = recvfrom(m_socket, packet, IP_MAXPACKET, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
-
+        while (!acceptPacket) {
+            int64_t numBytesRecv = recvfrom(m_socket, packet, IP_MAXPACKET, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
             if (numBytesRecv == -1) {
                 throw RawSocketException("The socket was not able to read the incoming ping: \n Reason: \n " + std::system_category().message(errno));
             }
 
-        } else {
-            bool isOriginCorrect = false;
+            uint8_t ipHeaderReceiveBuffer[sizeof(ip)] {};
+            std::memcpy(ipHeaderReceiveBuffer, packet, sizeof(ip));
+            IPv4Header ipHeaderReceive {IPv4Header(ipHeaderReceiveBuffer)};
+            icmphdr ICMPHeaderReceive {};
+            std::memcpy(&ICMPHeaderReceive,packet + sizeof(ip), sizeof(icmphdr));
 
-            while (!isOriginCorrect) {
 
-                numBytesRecv = recvfrom(m_socket, packet, IP_MAXPACKET, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
+            if (!originIP.empty() && m_ipVersion == AF_INET) {
 
-                if (numBytesRecv == -1) {
-                    throw RawSocketException("The socket was not able to read the incoming ping: \n Reason: \n " + std::system_category().message(errno));
+                char recvIPBuffer[INET_ADDRSTRLEN] {};
+                const char *convResult = inet_ntop(m_ipVersion,
+                                                   &(reinterpret_cast<sockaddr_in *>(&origin)->sin_addr),
+                                                   recvIPBuffer, INET_ADDRSTRLEN);
+                if (convResult == nullptr) {
+                    throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
                 }
+                acceptPacket = strcmp(originIP.c_str(), recvIPBuffer) == 0;
 
-                if (m_ipVersion == AF_INET) {
+            } else if (!originIP.empty() && m_ipVersion == AF_INET6) {
 
-                    char recvIPBuffer[INET_ADDRSTRLEN] {};
-                    const char *convResult = inet_ntop(m_ipVersion,
-                                                       &(reinterpret_cast<sockaddr_in *>(&origin)->sin_addr),
-                                                       recvIPBuffer, INET_ADDRSTRLEN);
-                    if (convResult == nullptr) {
-                        throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
-                    }
+                char recvIPBuffer[INET6_ADDRSTRLEN] {};
+                const char *convResult = inet_ntop(m_ipVersion, &(reinterpret_cast<sockaddr_in6*>(&origin)->sin6_addr), recvIPBuffer, INET6_ADDRSTRLEN);
 
-                    isOriginCorrect = (strcmp(recvIPBuffer, originIP.c_str()) == 0); // update while guard
-
-                } else if (m_ipVersion == AF_INET6) {
-
-                    char recvIPBuffer[INET6_ADDRSTRLEN] {};
-                    const char *convResult = inet_ntop(m_ipVersion, &(reinterpret_cast<sockaddr_in6*>(&origin)->sin6_addr), recvIPBuffer, INET6_ADDRSTRLEN);
-
-                    if (convResult == nullptr) {
-                        throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
-                    }
-
-                    isOriginCorrect = (strcmp(recvIPBuffer, originIP.c_str()) == 0); // update while guard
+                if (convResult == nullptr) {
+                    throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
                 }
-
+                acceptPacket = strcmp(originIP.c_str(), recvIPBuffer) == 0;
             }
+            // Anti Tampering and Packet Integrity Checks
+            acceptPacket = (originIP.empty() || acceptPacket) && ipHeaderReceive.getProtocol() == IPPROTO_ICMP
+            && (seqNum == 0 || seqNum == ipHeaderReceive.getID());
         }
-
     }
 
     static size_t constructARPEchoRequestPacket(uint8_t* packet, const uint32_t& dstIPAddress,
@@ -262,47 +255,34 @@ public:
         sockaddr_ll origin {};
         socklen_t originAddrLen = sizeof(origin);
 
-        int64_t numBytesRecv {0};
+        bool acceptPacket = false;
 
-        if (originIP.empty()) {
-            numBytesRecv = recvfrom(m_socket, recvBuffer, ETH_FRAME_LEN, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
-
+        while (!acceptPacket) {
+            int64_t numBytesRecv = recvfrom(m_socket, recvBuffer, ETH_FRAME_LEN, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
             if (numBytesRecv == -1) {
                 throw RawSocketException("The socket was not able to read the incoming arp echo reply: \n Reason: \n " + std::system_category().message(errno));
             }
-        } else {
-            bool isOriginCorrect = false;
 
-            while (!isOriginCorrect) {
+            ether_header ethernetHeaderResponse {};
+            std::memcpy(&ethernetHeaderResponse, recvBuffer, sizeof(ether_header));
 
-                numBytesRecv = recvfrom(m_socket, recvBuffer, ETH_FRAME_LEN, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
-                if (numBytesRecv == -1) {
-                    throw RawSocketException("The socket was not able to read the incoming arp echo reply: \n Reason: \n " + std::system_category().message(errno));
-                }
-
-                ether_header ethernetHeaderResponse {};
-                std::memcpy(&ethernetHeaderResponse, recvBuffer, sizeof(ether_header));
-
-                IPv4ToMACARPPacket arpResponse {};
-                std::memcpy(&arpResponse, recvBuffer + sizeof(ether_header), sizeof(IPv4ToMACARPPacket));
-                char srcIPAddress[INET_ADDRSTRLEN] {};
-                const char* convResult = inet_ntop(AF_INET, &arpResponse.srcIPv4, srcIPAddress,INET_ADDRSTRLEN);
-
-                if (convResult == nullptr) {
-                    throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
-                }
-
-                if (std::equal(std::begin(ethernetHeaderResponse.ether_shost), std::end(ethernetHeaderResponse.ether_shost), std::begin(arpResponse.srcMAC))) {
-                    // protection against packet tempering
-                    isOriginCorrect = (strcmp(originIP.c_str(), srcIPAddress) == 0);
-                }
+            IPv4ToMACARPPacket arpResponse {};
+            std::memcpy(&arpResponse, recvBuffer + sizeof(ether_header), sizeof(IPv4ToMACARPPacket));
+            char srcIPAddress[INET_ADDRSTRLEN] {};
+            const char* convResult = inet_ntop(AF_INET, &arpResponse.srcIPv4, srcIPAddress,INET_ADDRSTRLEN);
+            if (convResult == nullptr) {
+                throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
             }
+
+            // Anti Tampering and Packet Integrity Checks
+            acceptPacket = (originIP.empty() || (!originIP.empty() && strcmp(originIP.c_str(), srcIPAddress) == 0))
+            && std::equal(std::begin(ethernetHeaderResponse.ether_shost), std::end(ethernetHeaderResponse.ether_shost), std::begin(arpResponse.srcMAC))
+            && ntohs(ethernetHeaderResponse.ether_type) == ETHERTYPE_ARP && ntohs(arpResponse.arpOperationCode) == ARPOP_REPLY
+            && arpResponse.hardAddrLength == ETH_ALEN && arpResponse.protoAddrLength == 4
+            && (ntohs(arpResponse.hardAddrFormat) == ARPHRD_ETHER) && (ntohs(arpResponse.protoAddrFormat) == ETH_P_IP)
+            && origin.sll_pkttype == PACKET_HOST;
         }
-
-
-
     }
-
 };
 
 

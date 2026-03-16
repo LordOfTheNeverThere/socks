@@ -89,7 +89,7 @@ TEST(MethodChecking, sendReceiveARPPing) {
     std::string senderIP {myMachine.getIPAddress()};
     std::string senderMAC {myMachine.getMacAddress()};
     std::string interfaceName {myMachine.getInterfaceName()};
-    std::string destinationIP {"192.168.1.1"};
+    std::string destinationIP {"10.7.7.1"};
 
     RawSocket socket {AF_PACKET, htons(ETH_P_ARP)};
     socket.sendArpEchoRequest(destinationIP, senderMAC, senderIP, interfaceName);
@@ -113,7 +113,7 @@ TEST(MethodChecking, sendReceiveARPPingWithIPQuery) {
     std::string senderIP {myMachine.getIPAddress()};
     std::string senderMAC {myMachine.getMacAddress()};
     std::string interfaceName {myMachine.getInterfaceName()};
-    std::string destinationIP {"192.168.1.1"};
+    std::string destinationIP {"10.7.7.1"};
 
     RawSocket socket {AF_PACKET, htons(ETH_P_ARP)};
     socket.sendArpEchoRequest(destinationIP, senderMAC, senderIP, interfaceName);

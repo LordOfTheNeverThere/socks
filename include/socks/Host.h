@@ -107,21 +107,21 @@ public:
 
 
     void populateFromARPEchoReply(const uint8_t* reply, const std::string& ipString = "") {
-
-        IPv4ToMACARPPacket arpResponse {};
-        std::memcpy(&arpResponse, reply + sizeof(ether_header), sizeof(IPv4ToMACARPPacket));
-
         if (ipString.empty()) {
+            IPv4ToMACARPPacket arpResponse {};
+            std::memcpy(&arpResponse, reply + sizeof(ether_header), sizeof(IPv4ToMACARPPacket));
             char srcIPAddress[INET_ADDRSTRLEN] {};
             const char* convResult = inet_ntop(AF_INET, &arpResponse.srcIPv4, srcIPAddress,INET_ADDRSTRLEN);
             if (convResult == nullptr) {
                 throw HostException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
             }
             setIPAddress(srcIPAddress);
+        } else {
+            setIPAddress(ipString);
         }
 
-
-
+        ether_header ethernetHeaderResponse {};
+        std::memcpy(&ethernetHeaderResponse, reply, sizeof(ether_header));
     }
 };
 #endif //SOCKS_HOST_H
