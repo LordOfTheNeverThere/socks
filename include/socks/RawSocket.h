@@ -61,24 +61,24 @@ public:
         return m_ipHeader.header == nullptr;
     }
 
-    size_t constructICMPPacketWithIPHeader(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const Int& seqNum)  {
+    size_t constructICMPPacketWithIPHeader(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const uint16_t& seqNum, const uint16_t& processIDNum)  {
 
         size_t ipHeaderSize {m_ipHeader.getHeaderLenghtInBytes()};
         m_ipHeader.setTotalLength(ipHeaderSize + headerSize + nanosecsSize);
         std::memset(packet, 0, ipHeaderSize + headerSize + nanosecsSize);
         std::memcpy(packet, m_ipHeader.header, ipHeaderSize);
 
-        return ipHeaderSize + constructICMPPacket(packet + ipHeaderSize, headerSize, nanosecsSize, seqNum);
+        return ipHeaderSize + constructICMPPacket(packet + ipHeaderSize, headerSize, nanosecsSize, seqNum, processIDNum);
     }
 
-    static size_t constructICMPPacket(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const Int& seqNum) {
+    static size_t constructICMPPacket(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const uint16_t& seqNum, const uint16_t& processIDNum) {
         std::memset(packet, 0, headerSize + nanosecsSize);
         icmp icmpHeader {};
         // Build ICMP Header
         icmpHeader.icmp_type = ICMP_ECHO;
         icmpHeader.icmp_code = 0;
-        icmpHeader.icmp_id = htons(getpid());
-        icmpHeader.icmp_seq = seqNum;
+        icmpHeader.icmp_id = processIDNum == 0 ?  htons(getpid()) : htons(processIDNum);
+        icmpHeader.icmp_seq = htons(seqNum);
         icmpHeader.icmp_cksum = 0; // Must be 0 for calculation
 
         uint64_t nanosecs = htobe64(std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now()).time_since_epoch().count()); // get nanosecs since Jan 1970
@@ -93,7 +93,7 @@ public:
     }
 
 
-    size_t sendPing(const std::string& destIP, const Int& seqNum = 0){
+    size_t sendPing(const std::string& destIP, const uint16_t& seqNum = 0, const uint16_t& processIDNum = 0){
 
 
         sockaddr_storage destination {};
@@ -116,13 +116,13 @@ public:
 
         if (autogenerateIPHeader()) {
             uint8_t packet[headerSize + nanosecsSize];
-            bytesToSend = constructICMPPacket(packet, headerSize, nanosecsSize, seqNum);
+            bytesToSend = constructICMPPacket(packet, headerSize, nanosecsSize, seqNum, processIDNum);
             sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
         } else {
             size_t ipHeaderSize = m_ipHeader.getHeaderLenghtInBytes();
             // create memory buffer to load the packet unto
             uint8_t packet[ipHeaderSize + headerSize + nanosecsSize];
-            bytesToSend = constructICMPPacketWithIPHeader(packet, headerSize, nanosecsSize, seqNum);
+            bytesToSend = constructICMPPacketWithIPHeader(packet, headerSize, nanosecsSize, seqNum, processIDNum);
             sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
         }
 
@@ -134,7 +134,7 @@ public:
         return sent;
     }
 
-    void receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "", const Int& seqNum = 0) const {
+    void receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "", const Int& seqNum = 0,  const Int& processIDNum = 0) const {
         sockaddr_storage origin {};
         socklen_t originAddrLen = sizeof(origin);
 
@@ -176,7 +176,9 @@ public:
             }
             // Anti Tampering and Packet Integrity Checks
             acceptPacket = (originIP.empty() || acceptPacket) && ipHeaderReceive.getProtocol() == IPPROTO_ICMP
-            && (seqNum == 0 || seqNum == ipHeaderReceive.getID());
+            && (seqNum == 0 || seqNum == ntohs(ICMPHeaderReceive.un.echo.sequence))
+            && (processIDNum == 0  || processIDNum == ntohs(ICMPHeaderReceive.un.echo.id))
+            && ICMPHeaderReceive.type == ICMP_ECHOREPLY;
         }
     }
 

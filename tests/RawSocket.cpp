@@ -10,7 +10,7 @@ TEST(Misc, checkingICMPChecksumCalculation) {
 
     // create memory buffer to load the packet unto
     uint8_t packet[headerSize + nanosecsSize] = {};
-    RawSocket::constructICMPPacket(packet, headerSize, nanosecsSize, 0);
+    RawSocket::constructICMPPacket(packet, headerSize, nanosecsSize, 0, 0);
 
     EXPECT_EQ(Tools::add16BitOnesComplement(packet, headerSize + nanosecsSize), std::numeric_limits<uint16_t>::max());
 
@@ -29,7 +29,7 @@ TEST(MethodChecking, sendPingReceivePing) {
     socket.sendPing(destinationIP);
 
     uint8_t packet[IP_MAXPACKET] {};
-    socket.receivePing(packet);
+    socket.receivePing(packet, destinationIP, 0 , 0);
 
     uint64_t nanosecs {};
     memcpy( &nanosecs,packet + sizeof(icmp), sizeof(uint64_t));
@@ -60,10 +60,10 @@ TEST(MethodChecking, sendPingReceivePingWithIPHeader) {
     uint8_t ipHeaderSendBuffer[sizeof(ip)] {};
     IPv4Header ipHeaderSend {IPv4Header(ipHeaderSendBuffer, senderIP.c_str(), destinationIP.c_str(),0, 0)}; // these values will be filled when sending the ping
     socket.setIPHeader(ipHeaderSend);
-    socket.sendPing(destinationIP);
+    socket.sendPing(destinationIP, 1, 2);
 
     uint8_t packet[IP_MAXPACKET] {};
-    socket.receivePing(packet);
+    socket.receivePing(packet, destinationIP, 1 , 2);
 
     uint64_t nanosecs {};
     std::memcpy( &nanosecs,packet + sizeof(icmp), sizeof(uint64_t));
