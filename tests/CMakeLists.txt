@@ -5,7 +5,7 @@ add_executable(socksTests NetworkListener.cpp
 
 add_executable(sudoSocksTests
         RawSocket.cpp
-        Host.cpp
+        LocalHost.cpp
 )
 
 

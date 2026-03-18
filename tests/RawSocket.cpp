@@ -10,20 +10,23 @@ TEST(Misc, checkingICMPChecksumCalculation) {
 
     // create memory buffer to load the packet unto
     uint8_t packet[headerSize + nanosecsSize] = {};
-    RawSocket::constructICMPPacket(packet, headerSize, nanosecsSize, 0, 0);
+    uint16_t expectedID {69};
+    RawSocket::constructICMPPacket(packet, headerSize, nanosecsSize, 0, expectedID);
 
     EXPECT_EQ(Tools::add16BitOnesComplement(packet, headerSize + nanosecsSize), std::numeric_limits<uint16_t>::max());
 
     uint16_t id {};
-    memcpy(&id, packet + sizeof(uint8_t)*2 + sizeof(uint16_t), sizeof(uint16_t));
-    EXPECT_EQ(ntohs(id), getpid()); // Check that ID was created successfully
+    std::memcpy(&id, packet + sizeof(uint8_t)*2 + sizeof(uint16_t), sizeof(uint16_t));
+    EXPECT_EQ(ntohs(id), expectedID); // Check that ID was created successfully
 }
 
 
 TEST(MethodChecking, sendPingReceivePing) {
+
     LocalHost myMachine {true};
-    std::string senderIP {myMachine.getIPAddress()};
-    std::string destinationIP {"8.8.8.8"};
+    std::string destinationIP {Tools::getDefaultGateway()};
+    InternalInterface interfaceWithGateway = myMachine.getInterfaceFromSubnet(destinationIP, AF_INET);
+    std::string senderIP {interfaceWithGateway.getIPAddress()};
 
     RawSocket socket {AF_INET, IPPROTO_ICMP};
     socket.sendPing(destinationIP);
@@ -53,8 +56,9 @@ TEST(MethodChecking, sendPingReceivePing) {
 TEST(MethodChecking, sendPingReceivePingWithIPHeader) {
 
     LocalHost myMachine {true};
-    std::string senderIP {myMachine.getIPAddress()};
-    std::string destinationIP {"8.8.8.8"};
+    std::string destinationIP {Tools::getDefaultGateway()};
+    InternalInterface interfaceWithGateway = myMachine.getInterfaceFromSubnet(destinationIP, AF_INET);
+    std::string senderIP {interfaceWithGateway.getIPAddress()};
 
     RawSocket socket {AF_INET, IPPROTO_ICMP};
     uint8_t ipHeaderSendBuffer[sizeof(ip)] {};
@@ -84,12 +88,15 @@ TEST(MethodChecking, sendPingReceivePingWithIPHeader) {
 }
 
 TEST(MethodChecking, sendReceiveARPPing) {
-    LocalHost myMachine {true};
 
-    std::string senderIP {myMachine.getIPAddress()};
-    std::string senderMAC {myMachine.getMacAddress()};
-    std::string interfaceName {myMachine.getInterfaceName()};
+    LocalHost myMachine {true};
     std::string destinationIP {Tools::getDefaultGateway()};
+    InternalInterface interfaceWithGateway = myMachine.getInterfaceFromSubnet(destinationIP, AF_INET);
+
+    std::string senderIP {interfaceWithGateway.getIPAddress()};
+    std::string senderMAC {interfaceWithGateway.getMacAddress()};
+    std::string interfaceName {interfaceWithGateway.getInterfaceName()};
+
 
     RawSocket socket {AF_PACKET, htons(ETH_P_ARP)};
     socket.sendArpEchoRequest(destinationIP, senderMAC, senderIP, interfaceName);
@@ -108,12 +115,15 @@ TEST(MethodChecking, sendReceiveARPPing) {
 
 
 TEST(MethodChecking, sendReceiveARPPingWithIPQuery) {
-    LocalHost myMachine {true};
 
-    std::string senderIP {myMachine.getIPAddress()};
-    std::string senderMAC {myMachine.getMacAddress()};
-    std::string interfaceName {myMachine.getInterfaceName()};
+    LocalHost myMachine {true};
     std::string destinationIP {Tools::getDefaultGateway()};
+    InternalInterface interfaceWithGateway = myMachine.getInterfaceFromSubnet(destinationIP, AF_INET);
+
+    std::string senderIP {interfaceWithGateway.getIPAddress()};
+    std::string senderMAC {interfaceWithGateway.getMacAddress()};
+    std::string interfaceName {interfaceWithGateway.getInterfaceName()};
+
 
     RawSocket socket {AF_PACKET, htons(ETH_P_ARP)};
     socket.sendArpEchoRequest(destinationIP, senderMAC, senderIP, interfaceName);

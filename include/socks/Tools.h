@@ -131,6 +131,20 @@ class Tools {
 
         return "No default gateway found";
     }
+
+    static bool belongsToSubnetIPv4(const uint32_t ipQuery, const uint32_t ip, const uint32_t mask) {
+        return (ipQuery & mask)==(ip & mask);
+    }
+
+    static bool belongsToSubnetIPv6(const in6_addr& ipQuery, const in6_addr& ip, const in6_addr& mask) {
+        for (int i = 0; i < 16; ++i) {
+            if ((ipQuery.s6_addr[i] & mask.s6_addr[i]) != (ip.s6_addr[i] & mask.s6_addr[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 };
 
 #endif //SOCKS_TOOLS_H

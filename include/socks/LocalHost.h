@@ -4,30 +4,39 @@
 
 #ifndef SOCKS_LOCALHOST_H
 #define SOCKS_LOCALHOST_H
-#include "Host.h"
+#include <net/if.h>
+#include <ifaddrs.h>
+#include <vector>
+#include <map>
 
-class LocalHost : public Host{
+#include "InternalInterface.h"
+#include "NameResolutionException.h"
+
+class LocalHost{
 
 private:
-    std::string m_interfaceName {"Unknown"};
+    std::vector<InternalInterface> m_interfaces {};
+
 public:
-    LocalHost(bool populate = false) : Host() {
+    LocalHost(bool populate = false)  {
         if (populate) {
             getDataFromCurrentHost();
         }
     }
 
-    std::string getInterfaceName() {
-        return m_interfaceName;
+    std::vector<InternalInterface> getInterfaces() {
+        return m_interfaces;
     }
 
-    void setInterfaceName(const std::string &name) {
-        m_interfaceName = name;
+    void clearInterfaces() {
+        for (auto interface: m_interfaces) {
+            interface.clearAttributes();
+        }
     }
 
-    void getDataFromCurrentHost(Int ipVersion = AF_INET, std::string name = "") {
+    void getDataFromCurrentHost() {
 
-        clearAttributes();
+        clearInterfaces();
         ifaddrs *interfaceAddresses {};
 
         Int result = getifaddrs(&interfaceAddresses);
@@ -37,9 +46,12 @@ public:
         }
         std::map<std::string, std::string> macAddresses {};
 
+        // Get MAC Addresses and UP NON LOOPBACK interfaces
         for (ifaddrs *ptrToInterface = interfaceAddresses; ptrToInterface != nullptr; ptrToInterface = ptrToInterface->ifa_next) {
-            if (ptrToInterface->ifa_addr !=nullptr && (ptrToInterface->ifa_flags & IFF_LOOPBACK) != IFF_LOOPBACK && (ptrToInterface->ifa_flags & IFF_UP) == IFF_UP
-            && ptrToInterface->ifa_addr->sa_family == AF_PACKET && (name.empty() || strcmp(name.c_str(), ptrToInterface->ifa_name) == 0)) {
+            if (ptrToInterface->ifa_addr !=nullptr
+            && (ptrToInterface->ifa_flags & IFF_LOOPBACK) != IFF_LOOPBACK
+            && (ptrToInterface->ifa_flags & IFF_UP) == IFF_UP
+            && ptrToInterface->ifa_addr->sa_family == AF_PACKET) {
 
                 std::string interfaceName = ptrToInterface->ifa_name;
                 std::string macAddress {Tools::macToString(reinterpret_cast<sockaddr_ll*>(ptrToInterface->ifa_addr))};
@@ -47,37 +59,33 @@ public:
             }
         }
 
-        if (macAddresses.size() == 1) {
-            name = macAddresses.begin()->first;
-        }
+        //Populate the Interfaces with both Layer 2 and 3 info
+        for (ifaddrs *ptrToInterface = interfaceAddresses; ptrToInterface != nullptr; ptrToInterface = ptrToInterface->ifa_next) {
 
-        for (ifaddrs *ptrToInterface = interfaceAddresses; ptrToInterface != nullptr && !isObjectPopulated() ; ptrToInterface = ptrToInterface->ifa_next) {
-            if (ptrToInterface->ifa_addr != nullptr && ptrToInterface->ifa_addr->sa_family == ipVersion && ptrToInterface->ifa_netmask != nullptr
-                && (ptrToInterface->ifa_flags & IFF_LOOPBACK) != IFF_LOOPBACK && (ptrToInterface->ifa_flags & IFF_UP) == IFF_UP) {
+            sa_family_t ipVersion {ptrToInterface->ifa_addr->sa_family};
+            auto iterator {macAddresses.find(ptrToInterface->ifa_name)};
+            if ((ipVersion == AF_INET || ipVersion == AF_INET6) && iterator != macAddresses.end()) {
 
-                if (!name.empty() && std::strcmp(name.c_str(), ptrToInterface->ifa_name) != 0) {
-                    continue;
-                } else {
-                    setMacAddress(macAddresses.at(ptrToInterface->ifa_name));
-                    setInterfaceName(ptrToInterface->ifa_name);
-                }
+                InternalInterface interface {};
+                interface.setInterfaceName(ptrToInterface->ifa_name);
+                interface.setMacAddress(iterator->second);
+                interface.setIPVersion(ipVersion);
 
                 if (ipVersion == AF_INET) {
                     char ipAddress[INET_ADDRSTRLEN] {};
-
                     const char *ptrToResultIP = inet_ntop(
                         ipVersion, &reinterpret_cast<sockaddr_in *>(ptrToInterface->ifa_addr)->sin_addr, ipAddress,
                         sizeof(ipAddress));
                     if (ptrToResultIP == nullptr) {
                         continue;
                     }
-                    m_ipAddress = ipAddress;
+                    interface.setIPAddress(ipAddress);
 
                     const char *ptrToResultMask = inet_ntop(ipVersion, &reinterpret_cast<sockaddr_in*>(ptrToInterface->ifa_netmask)->sin_addr, ipAddress, sizeof(ipAddress));
                     if (ptrToResultMask == nullptr) {
                         continue;
                     }
-                    m_networkMask = ipAddress;
+                    interface.setNetworkMask(ipAddress);
 
                 } else if (ipVersion == AF_INET6) {
 
@@ -86,30 +94,30 @@ public:
                     if (ptrToResultIP == nullptr) {
                         continue;
                     }
-                    m_ipAddress = ipAddress;
+                    interface.setIPAddress(ipAddress);
 
                     const char *ptrToResultMask = inet_ntop(ipVersion, &reinterpret_cast<sockaddr_in6*>(ptrToInterface->ifa_netmask)->sin6_addr, ipAddress, sizeof(ipAddress));
                     if (ptrToResultMask == nullptr) {
                         continue;
                     }
-                    m_networkMask = ipAddress;
-                } else {
-
-                    freeifaddrs(interfaceAddresses);
-                    throw GenericException("The ip version supplied is not allowed, try AF_INET or AF_INET6");
+                    interface.setNetworkMask(ipAddress);
                 }
+                m_interfaces.push_back(interface);
             }
         }
         freeifaddrs(interfaceAddresses);
-        if (!isObjectPopulated()) {
+        if (m_interfaces.empty()) {
             throw (GenericException("It was not possible to populate the data"));
         }
     }
 
-
-    void clearAttributes() {
-        m_interfaceName = "";
-        Host::clearAttributes();
+    InternalInterface getInterfaceFromSubnet(const std::string& ip, const sa_family_t& ipVersion) {
+        for (auto interface: m_interfaces) {
+            if (ipVersion == interface.getIPVersion() && interface.belongsToSubnet(ip)) {
+                return interface;
+            }
+        }
+        throw HostException("No interfaces connect to the network where " + ip + "is.");
     }
 };
 

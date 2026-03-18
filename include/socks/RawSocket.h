@@ -78,7 +78,7 @@ public:
         // Build ICMP Header
         icmpHeader.icmp_type = ICMP_ECHO;
         icmpHeader.icmp_code = 0;
-        icmpHeader.icmp_id = processIDNum == 0 ?  htons(getpid()) : htons(processIDNum);
+        icmpHeader.icmp_id = htons(processIDNum);
         icmpHeader.icmp_seq = htons(seqNum);
         icmpHeader.icmp_cksum = 0; // Must be 0 for calculation
 
@@ -106,9 +106,7 @@ public:
         } else if (m_ipVersion == AF_INET6) {
             conversionResult = inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in6*>(&destination)->sin6_addr));
         }
-        if (conversionResult != 1) {
-            throw RawSocketException("It was not possible to convert the destination address " + destIP + " into its binary form \nReason:\n " + std::system_category().message(errno));
-        }
+
 
         const size_t headerSize = sizeof(icmphdr); //use icmphdr instead of icmp for requests, icmp has part of the IP header which caused the host to reply with an error, since this is request it is nonsensical to include it here
         const size_t nanosecsSize = sizeof(uint64_t);
