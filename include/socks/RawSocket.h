@@ -106,7 +106,9 @@ public:
         } else if (m_ipVersion == AF_INET6) {
             conversionResult = inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in6*>(&destination)->sin6_addr));
         }
-
+        if (conversionResult != 1) {
+            throw RawSocketException("It was not possible to convert the destination address " + destIP + " into its binary form \nReason:\n " + std::system_category().message(errno));
+        }
 
         const size_t headerSize = sizeof(icmphdr); //use icmphdr instead of icmp for requests, icmp has part of the IP header which caused the host to reply with an error, since this is request it is nonsensical to include it here
         const size_t nanosecsSize = sizeof(uint64_t);
@@ -116,13 +118,18 @@ public:
         if (autogenerateIPHeader()) {
             uint8_t packet[headerSize + nanosecsSize];
             bytesToSend = constructICMPPacket(packet, headerSize, nanosecsSize, seqNum, processIDNum);
-            sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+            sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(sockaddr_in));
         } else {
             size_t ipHeaderSize = m_ipHeader.getHeaderLenghtInBytes();
             // create memory buffer to load the packet unto
             uint8_t packet[ipHeaderSize + headerSize + nanosecsSize];
             bytesToSend = constructICMPPacketWithIPHeader(packet, headerSize, nanosecsSize, seqNum, processIDNum);
-            sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+            if (m_ipVersion == AF_INET) {
+                sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(sockaddr_in));
+            } else if (m_ipVersion == AF_INET6) {
+                sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(sockaddr_in6));
+
+            }
         }
 
         if (sent == -1) {
@@ -203,6 +210,33 @@ public:
         return sizeof(ether_header) + sizeof(IPv4ToMACARPPacket);
     }
 
+    size_t sendArpEchoRequest(const uint32_t dstIPInBits, const std::array<uint8_t,6>& srcMACAddrBytes, const uint32_t srcIPInBits,
+        std::array<uint8_t,6> dstMACAddrBytes, const std::string& srcInterfaceName) {
+
+        sockaddr_ll destination {};
+        destination.sll_family = AF_PACKET;
+        destination.sll_protocol = htons(ETH_P_ARP);
+        const uint32_t interfaceIndex = if_nametoindex(srcInterfaceName.c_str());
+        if (interfaceIndex == 0) {
+            throw RawSocketException("The interface name \"" + srcInterfaceName + "\" could not be found\nReason:\n" + std::system_category().message(errno));
+        }
+        destination.sll_ifindex = interfaceIndex;
+        std::memcpy(destination.sll_addr, dstMACAddrBytes.data(), sizeof(dstMACAddrBytes));
+        destination.sll_halen = sizeof(dstMACAddrBytes);
+
+        uint8_t packet[sizeof(ether_header) + sizeof(IPv4ToMACARPPacket)];
+        size_t bytesToSend = constructARPEchoRequestPacket(packet, dstIPInBits, srcIPInBits, dstMACAddrBytes, srcMACAddrBytes);
+        size_t sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+
+        if (sent == -1) {
+            throw RawSocketException("ARP Echo Request failed from interface " + srcInterfaceName + "\nReason:\n" + std::system_category().message(errno));
+        } else if (sent != bytesToSend) {
+            throw RawSocketException("Not all of the packet was sent.\n Packet size: " + std::to_string(bytesToSend) + "\nSent: " + std::to_string(sent));
+        }
+
+        return sent;
+    }
+
     size_t sendArpEchoRequest(const std::string& dstIPAddress, const std::string& srcMacAddress, const std::string& srcIPAddress, const std::string& srcInterfaceName) {
         if (m_ipVersion != AF_PACKET) {
             throw RawSocketException("This socket needs the ipVersion == AF_PACKET to handle layer two traffic");
@@ -224,29 +258,7 @@ public:
         std::array<uint8_t,6> dstMACAddrBytes {};
         dstMACAddrBytes.fill(std::numeric_limits<uint8_t>::max());
         std::array<uint8_t,6> srcMACAddrBytes = Tools::stringToMac(srcMacAddress);
-
-        sockaddr_ll destination {};
-        destination.sll_family = AF_PACKET;
-        destination.sll_protocol = htons(ETH_P_ARP);
-        const uint32_t interfaceIndex = if_nametoindex(srcInterfaceName.c_str());
-        if (interfaceIndex == 0) {
-            throw RawSocketException("The interface name \"" + srcInterfaceName + "\" could not be found\nReason:\n" + std::system_category().message(errno));
-        }
-        destination.sll_ifindex = interfaceIndex;
-        std::memcpy(destination.sll_addr, dstMACAddrBytes.data(), sizeof(dstMACAddrBytes));
-        destination.sll_halen = sizeof(dstMACAddrBytes);
-
-
-        uint8_t packet[sizeof(ether_header) + sizeof(IPv4ToMACARPPacket)];
-        size_t bytesToSend = constructARPEchoRequestPacket(packet, dstIPAddressNum, srcIPAddressNum, dstMACAddrBytes, srcMACAddrBytes);
-        size_t sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
-
-        if (sent == -1) {
-            throw RawSocketException("ARP Echo Request to " + dstIPAddress + " failed. \n Reason: \n" + std::system_category().message(errno));
-        } else if (sent != bytesToSend) {
-            throw RawSocketException("Not all of the packet was sent.\n Packet size: " + std::to_string(bytesToSend) + "\nSent: " + std::to_string(sent));
-        }
-        return sent;
+        return sendArpEchoRequest(dstIPAddressNum, srcMACAddrBytes, srcIPAddressNum, dstMACAddrBytes, srcInterfaceName);
     }
 
     void receiveArpEchoReply(uint8_t recvBuffer[ETH_FRAME_LEN], const std::string originIP = "") {

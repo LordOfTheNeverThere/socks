@@ -8,6 +8,7 @@
 #include <sstream>
 #include <fstream>
 #include <array>
+#include <vector>
 #include <arpa/inet.h>
 #include <bits/socket.h>
 #include <linux/if_ether.h>
@@ -143,6 +144,15 @@ class Tools {
             }
         }
         return true;
+    }
+
+    static uint32_t getNumberOfIPsInMaskIPv4(uint32_t& maskInBits) {return ~(maskInBits);}
+
+
+    static void generateIPv4Range(const uint32_t& ipInBits, const uint32_t& maskInBits, std::vector<uint32_t>& resultVector) {
+        for (uint32_t i = 0; i <= ~maskInBits; ++i) {
+            resultVector.push_back((ipInBits & maskInBits) | i);
+        }
     }
 
 };
