@@ -93,22 +93,7 @@ public:
         return headerSize + nanosecsSize;
     }
 
-
-    size_t sendPing(const std::string& destIP, const uint16_t& seqNum = 0, const uint16_t& processIDNum = 0){
-
-
-        sockaddr_storage destination {};
-        destination.ss_family = m_ipVersion;
-
-        Int conversionResult {};
-        if (m_ipVersion == AF_INET) {
-            conversionResult = inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in*>(&destination)->sin_addr));
-        } else if (m_ipVersion == AF_INET6) {
-            conversionResult = inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in6*>(&destination)->sin6_addr));
-        }
-        if (conversionResult != 1) {
-            throw RawSocketException("It was not possible to convert the destination address " + destIP + " into its binary form \nReason:\n " + std::system_category().message(errno));
-        }
+    size_t sendPing(sockaddr_storage& destination, const uint16_t& seqNum = 0, const uint16_t& processIDNum = 0) {
 
         const size_t headerSize = sizeof(icmphdr); //use icmphdr instead of icmp for requests, icmp has part of the IP header which caused the host to reply with an error, since this is request it is nonsensical to include it here
         const size_t nanosecsSize = sizeof(uint64_t);
@@ -128,16 +113,34 @@ public:
                 sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(sockaddr_in));
             } else if (m_ipVersion == AF_INET6) {
                 sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(sockaddr_in6));
-
             }
         }
 
         if (sent == -1) {
-            throw RawSocketException("Ping to " + destIP + " failed. \n Reason: \n" + std::system_category().message(errno));
+            throw RawSocketException("Ping failed.\n Reason: \n" + std::system_category().message(errno));
         } else if (bytesToSend != sent) {
             throw RawSocketException("Not all of the packet was sent.\n Packet size: " + std::to_string(bytesToSend) + "\nSent: " + std::to_string(sent));
         }
+
         return sent;
+    }
+
+    size_t sendPing(const std::string& destIP, const uint16_t& seqNum = 0, const uint16_t& processIDNum = 0){
+        
+        sockaddr_storage destination {};
+        destination.ss_family = m_ipVersion;
+
+        Int conversionResult {};
+        if (m_ipVersion == AF_INET) {
+            conversionResult = inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in*>(&destination)->sin_addr));
+        } else if (m_ipVersion == AF_INET6) {
+            conversionResult = inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in6*>(&destination)->sin6_addr));
+        }
+        if (conversionResult != 1) {
+            throw RawSocketException("It was not possible to convert the destination address " + destIP + " into its binary form \nReason:\n " + std::system_category().message(errno));
+        }
+
+       return sendPing(destination, seqNum, processIDNum);
     }
 
     void receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "", const Int& seqNum = 0,  const Int& processIDNum = 0) const {
