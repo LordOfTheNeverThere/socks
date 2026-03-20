@@ -39,23 +39,23 @@ TEST(MethodChecking, convertStringToMacWrongFormat) {
     EXPECT_THROW({
         try {
             Tools::stringToMac("F0:E1:D2:C3:B4:A5");
-        } catch( const GenericException& e ) {
-            EXPECT_STREQ("The stringToMac utility function only allows strings with 12 characters. So no other delimiter characters are allowed"
+        } catch( const WrongMACFormat& e ) {
+            EXPECT_STREQ("Wrong MAC format : F0:E1:D2:C3:B4:A5"
                 , e.what());
             throw; // Re-throw so EXPECT_THROW sees it
         }
-    }, GenericException);
+    }, WrongMACFormat);
 }
 
 TEST(MethodChecking, convertStringToMacWrongHex) {
     EXPECT_THROW({
     try {
         Tools::stringToMac("F0E1D2C3Z4A5");
-    } catch( const GenericException& e ) {
-        EXPECT_STREQ("Unknown Hexadecimal digit Z"
+    } catch( const WrongHexDigitFormat& e ) {
+        EXPECT_STREQ("Wrong hex digit format : Z"
             , e.what());
         throw; // Re-throw so EXPECT_THROW sees it
     }
-}, GenericException);
+}, WrongHexDigitFormat);
 }
 

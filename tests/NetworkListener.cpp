@@ -23,13 +23,13 @@ TEST(ErrorChecking, LocalhostResponseError) {
     EXPECT_THROW({
     try {
         socket.fetchInterfacesToBind("8080", 7, 0);
-    } catch( const GenericException& e ) {
+    } catch( const NameResolutionException& e ) {
         EXPECT_STREQ("The name resolution was not able to find any viable interfaces for the socket connection to localhost on port: 8080 and IP version: 7."
                      "\nPrompting the error with status code: ai_family not supported"
             , e.what());
         throw; // Re-throw so EXPECT_THROW sees it
     }
-}, GenericException);
+}, NameResolutionException);
 }
 
 
@@ -54,13 +54,13 @@ TEST(ErrorChecking, RemoteHostResponseError) {
     EXPECT_THROW({
         try {
             socket.fetchInterfacesToConnect("myata","65000", AF_INET6, 0);
-        } catch( const GenericException& e ) {
+        } catch( const NameResolutionException& e ) {
             EXPECT_STREQ("The name resolution was not able to find any viable interfaces for the socket connection to myata on port: 65000 and IP version: 10."
                          "\nPrompting the error with status code: Temporary failure in name resolution"
                 , e.what());
             throw; // Re-throw so EXPECT_THROW sees it
         }
-    }, GenericException);
+    }, NameResolutionException);
 }
 
 
@@ -71,11 +71,10 @@ TEST(MethodChecking, createSocketAndBind) {
     try {
         L4Socket socket =  L4Socket(listener, true);
         EXPECT_NE(socket.m_socket, -1);
-    } catch (GenericException& caught) {
+    } catch (std::runtime_error& caught) {
         error = caught.what();
     }
     EXPECT_EQ(error,"");
-
 }
 
 
@@ -133,7 +132,7 @@ TEST(MethodChecking, twoClientAndServerMock) {
             L4Socket serverSocket =  L4Socket(server, true);
             serverSocket.send(outgoing, 5, 5, true, connectionTimeout);
 
-        } catch (GenericException caught) {
+        } catch (std::runtime_error caught) {
             std::cerr << caught.what() << "\n";
         }
         exit(0);

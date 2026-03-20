@@ -5,9 +5,7 @@
 #ifndef SOCKS_SCOKET_H
 #define SOCKS_SCOKET_H
 
-#include "ClientSocketException.h"
 #include "NetworkListener.h"
-#include "ServerSocketException.h"
 #include "Socket.h"
 #include "types.h"
 
@@ -61,7 +59,7 @@ private:
         sigemptyset(&sa.sa_mask);
         sa.sa_flags = SA_RESTART;
         if (sigaction(SIGCHLD, &sa, nullptr) == -1) {
-            throw ServerSocketException("Could not reap zombie processes of previously closed connections");
+            throw ZombieReapingException();
         }
         while (true) {
             if (durationSeconds > 0) {
@@ -81,7 +79,7 @@ private:
                 }
                 else if (activity == 0) {
                     //timeout reached
-                    throw ServerSocketException("Server waited for " + std::to_string(durationSeconds) + " seconds, but no connection attempt was made.");
+                    throw ServerWaitingException(durationSeconds);
                 }
             }
             Int connectedSocket = accept(m_socket, reinterpret_cast<sockaddr*>(&clientAddress), &sizeClientAddress);
@@ -133,7 +131,6 @@ private:
 public:
     L4Socket (NetworkListener& listener, const bool isServer) {
 
-
         for (AddressInfo &interface: listener.m_interfaces) {
 
             m_socket = socket(interface.family, interface.socketType, interface.protocol);
@@ -145,23 +142,21 @@ public:
 
             if (isServer) {
                 if (bindSocketToInterface(interface)) {
-                    const std::string error = "The binding of the socket to port: " + std::to_string(interface.port) + " failed. \n Reason: \n" + std::system_category().message(errno);
-                    throw ServerSocketException(error);
+                    continue;
                 };
             }
             else {
                 if (connectSocketToInterface(interface)) {
-                    const std::string error = "The connection of the socket to IP and port: " + interface.ipString + ":" + std::to_string(interface.port) + " on the server failed. \n Reason: \n" + std::system_category().message(errno);
-                    throw ClientSocketException(error);
+                    continue;
                 };
             }
             return;
         }
         if (isServer) {
-            throw ServerSocketException("It was not possible to bind any interface to the socket.");
+            throw BindingFailedException();
         }
         else {
-            throw ClientSocketException("It was not possible to connect any interface to the socket.");
+            throw ConnectionFailedException();
         }
     }
 
@@ -169,7 +164,7 @@ public:
     void send(const void* msgToSend, const size_t msgSize, const Int connectionQueueNumber = 7, const bool multiConnection = true, const Int durationSeconds = -1) {
         Int listening = listen(m_socket, connectionQueueNumber);
         if (listening == -1) {
-            throw ServerSocketException("Could not make a listening socket for the server. \n Reason: \n" + std::system_category().message(errno));
+            throw ServerListeningException();
         }
 
         sockaddr_storage clientAddress {};
@@ -186,10 +181,10 @@ public:
                 } else {
                     inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in6));
                 }
-                throw ServerSocketException("It was not possible to accept the connection to the socket from: " + ipNameBuffer);
+                throw ServerAcceptingException(ipNameBuffer);
             }
             if (::send(connectedSocket, msgToSend, msgSize, 0) == -1) {
-                throw ServerSocketException("Error sending. \n Reason: \n " + std::system_category().message(errno));
+                throw SendingException();
             }
             close(connectedSocket); // message was sent no more sending required.
         }
@@ -199,7 +194,7 @@ public:
     Int receive(void* msgReceived, const size_t msgSize) const {
         const Int bytesReceived = static_cast<Int>(recv(m_socket, msgReceived, msgSize, 0));
         if (bytesReceived == -1) {
-            throw ClientSocketException("It was not possible for the client to collect the message from the server. \n Reason : \n " + std::system_category().message(errno));
+            throw ReceivingException();
         }
         return bytesReceived;
     }

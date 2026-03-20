@@ -10,7 +10,7 @@
 #include <map>
 
 #include "InternalInterface.h"
-#include "NameResolutionException.h"
+#include "Exceptions.h"
 
 class LocalHost{
 
@@ -41,8 +41,7 @@ public:
 
         Int result = getifaddrs(&interfaceAddresses);
         if (result != 0) {
-            throw NameResolutionException("The resolution of the machine's address, gateway, netmask and name was unsuccessful.\nReason:\n "
-                + std::system_category().message(errno));
+            throw UnresolvedInternalInterfacesException();
         }
         std::map<std::string, std::string> macAddresses {};
 
@@ -107,8 +106,26 @@ public:
         }
         freeifaddrs(interfaceAddresses);
         if (m_interfaces.empty()) {
-            throw (GenericException("It was not possible to populate the data"));
+            throw LocalHostConstructionException();
         }
+    }
+
+    InternalInterface getInterfaceFromSubnetIPv6(const in6_addr& ipAddr) const {
+        for (auto interface: m_interfaces) {
+            if (AF_INET6 == interface.getIPVersion() && interface.belongsToSubnetIPv6(ipAddr)) {
+                return interface;
+            }
+        }
+        return InternalInterface();
+    }
+
+    InternalInterface getInterfaceFromSubnetIPv4(const uint32_t ipInBits) const {
+        for (auto interface: m_interfaces) {
+            if (AF_INET == interface.getIPVersion() && interface.belongsToSubnetIPv4(ipInBits)) {
+                return interface;
+            }
+        }
+        return InternalInterface();
     }
 
     InternalInterface getInterfaceFromSubnet(const std::string& ip, const sa_family_t& ipVersion) {
@@ -117,7 +134,7 @@ public:
                 return interface;
             }
         }
-        throw HostException("No interfaces connect to the network where " + ip + "is.");
+        return InternalInterface();
     }
 };
 

@@ -5,14 +5,12 @@
 #ifndef SOCKS_RAWSOCKET_H
 #define SOCKS_RAWSOCKET_H
 #include <array>
-#include <system_error>
 #include <unistd.h>
 #include <chrono>
 #include <cstring>
 #include <arpa/inet.h>
 #include <netpacket/packet.h>
 #include <net/if.h>
-#include "RawSocketException.h"
 #include "Socket.h"
 #include <netinet/ip_icmp.h>
 #include <net/ethernet.h>
@@ -34,14 +32,14 @@ public:
     RawSocket(const Int& ipVersion, const Int& protocol) :  m_protocol(protocol) {
 
         if (ipVersion != AF_INET && ipVersion != AF_INET6 && ipVersion != AF_PACKET) {
-            throw RawSocketException("The family type with ID: " + std::to_string(ipVersion) + " is not supported.");
+            throw UnsupportedAFTypeException(ipVersion);
         } else {
             m_ipVersion = ipVersion;
         }
 
         m_socket = socket(ipVersion, SOCK_RAW, protocol);
         if (m_socket == -1) {
-            throw RawSocketException("The creation of the raw socket for protocol with ID: " + std::to_string(protocol) + " failed. \n Reason: \n" + std::system_category().message(errno));
+            throw SocketCreationException();
         }
     }
 
@@ -53,7 +51,7 @@ public:
             Int socketOpt = setsockopt(m_socket,IPPROTO_IP,IP_HDRINCL, &one, sizeof(one));
             m_ipVersion = AF_INET;
             if (socketOpt == -1) {
-                throw RawSocketException("The setting of the socket option IP_HDRINCL failed.\nReason:\n" + std::system_category().message(errno));
+                throw SocketOptionException(IP_HDRINCL);
             }
         }
     }
@@ -117,9 +115,9 @@ public:
         }
 
         if (sent == -1) {
-            throw RawSocketException("Ping failed.\n Reason: \n" + std::system_category().message(errno));
+            throw SendingException();
         } else if (bytesToSend != sent) {
-            throw RawSocketException("Not all of the packet was sent.\n Packet size: " + std::to_string(bytesToSend) + "\nSent: " + std::to_string(sent));
+            throw SendingException(bytesToSend, sent);
         }
 
         return sent;
@@ -137,7 +135,7 @@ public:
             conversionResult = inet_pton(m_ipVersion, destIP.c_str(), &(reinterpret_cast<sockaddr_in6*>(&destination)->sin6_addr));
         }
         if (conversionResult != 1) {
-            throw RawSocketException("It was not possible to convert the destination address " + destIP + " into its binary form \nReason:\n " + std::system_category().message(errno));
+            throw ConversionToIPBinaryException(destIP);
         }
 
        return sendPing(destination, seqNum, processIDNum);
@@ -152,7 +150,7 @@ public:
         while (!acceptPacket) {
             int64_t numBytesRecv = recvfrom(m_socket, packet, IP_MAXPACKET, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
             if (numBytesRecv == -1) {
-                throw RawSocketException("The socket was not able to read the incoming ping: \n Reason: \n " + std::system_category().message(errno));
+                throw ReceivingException();
             }
 
             uint8_t ipHeaderReceiveBuffer[sizeof(ip)] {};
@@ -169,7 +167,7 @@ public:
                                                    &(reinterpret_cast<sockaddr_in *>(&origin)->sin_addr),
                                                    recvIPBuffer, INET_ADDRSTRLEN);
                 if (convResult == nullptr) {
-                    throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
+                    throw ConversionToIPStringException();
                 }
                 acceptPacket = strcmp(originIP.c_str(), recvIPBuffer) == 0;
 
@@ -179,7 +177,7 @@ public:
                 const char *convResult = inet_ntop(m_ipVersion, &(reinterpret_cast<sockaddr_in6*>(&origin)->sin6_addr), recvIPBuffer, INET6_ADDRSTRLEN);
 
                 if (convResult == nullptr) {
-                    throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
+                    throw ConversionToIPStringException();
                 }
                 acceptPacket = strcmp(originIP.c_str(), recvIPBuffer) == 0;
             }
@@ -221,7 +219,7 @@ public:
         destination.sll_protocol = htons(ETH_P_ARP);
         const uint32_t interfaceIndex = if_nametoindex(srcInterfaceName.c_str());
         if (interfaceIndex == 0) {
-            throw RawSocketException("The interface name \"" + srcInterfaceName + "\" could not be found\nReason:\n" + std::system_category().message(errno));
+            throw InterfaceNotFoundByName(srcInterfaceName);
         }
         destination.sll_ifindex = interfaceIndex;
         std::memcpy(destination.sll_addr, dstMACAddrBytes.data(), sizeof(dstMACAddrBytes));
@@ -232,9 +230,9 @@ public:
         size_t sent = sendto(m_socket, packet, bytesToSend, 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
 
         if (sent == -1) {
-            throw RawSocketException("ARP Echo Request failed from interface " + srcInterfaceName + "\nReason:\n" + std::system_category().message(errno));
-        } else if (sent != bytesToSend) {
-            throw RawSocketException("Not all of the packet was sent.\n Packet size: " + std::to_string(bytesToSend) + "\nSent: " + std::to_string(sent));
+            throw SendingException();
+        } else if (bytesToSend != sent) {
+            throw SendingException(bytesToSend, sent);
         }
 
         return sent;
@@ -242,20 +240,20 @@ public:
 
     size_t sendArpEchoRequest(const std::string& dstIPAddress, const std::string& srcMacAddress, const std::string& srcIPAddress, const std::string& srcInterfaceName) {
         if (m_ipVersion != AF_PACKET) {
-            throw RawSocketException("This socket needs the ipVersion == AF_PACKET to handle layer two traffic");
+            throw UnsupportedAFTypeException(m_ipVersion);
         }
         if (dstIPAddress.size() > 15 || dstIPAddress.size() < 7) {
-            throw RawSocketException("The Destination IP address " + dstIPAddress + " is not in an IPv4 format");
+            throw WrongIPv4Format(dstIPAddress);
         }
         uint32_t dstIPAddressNum {};
         uint32_t srcIPAddressNum {};
         Int conversionResult = inet_pton(AF_INET, dstIPAddress.c_str(), &dstIPAddressNum);
         if (conversionResult != 1) {
-            throw RawSocketException("It was not possible to convert the destination address " + dstIPAddress + " into its binary form \nReason:\n " + std::system_category().message(errno));
+            throw ConversionToIPBinaryException(dstIPAddress);
         }
         conversionResult = inet_pton(AF_INET, srcIPAddress.c_str(), &srcIPAddressNum);
         if (conversionResult != 1) {
-            throw RawSocketException("It was not possible to convert the source address " + srcIPAddress + " into its binary form \nReason:\n " + std::system_category().message(errno));
+            throw ConversionToIPBinaryException(srcIPAddress);
         }
 
         std::array<uint8_t,6> dstMACAddrBytes {};
@@ -266,7 +264,7 @@ public:
 
     void receiveArpEchoReply(uint8_t recvBuffer[ETH_FRAME_LEN], const std::string originIP = "") {
         if (m_ipVersion != AF_PACKET) {
-           throw RawSocketException("This socket needs the ipVersion == AF_PACKET to handle layer two traffic");
+            throw UnsupportedAFTypeException(m_ipVersion);
         }
         sockaddr_ll origin {};
         socklen_t originAddrLen = sizeof(origin);
@@ -276,7 +274,7 @@ public:
         while (!acceptPacket) {
             int64_t numBytesRecv = recvfrom(m_socket, recvBuffer, ETH_FRAME_LEN, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
             if (numBytesRecv == -1) {
-                throw RawSocketException("The socket was not able to read the incoming arp echo reply: \n Reason: \n " + std::system_category().message(errno));
+                throw ReceivingException();
             }
 
             ether_header ethernetHeaderResponse {};
@@ -287,7 +285,7 @@ public:
             char srcIPAddress[INET_ADDRSTRLEN] {};
             const char* convResult = inet_ntop(AF_INET, &arpResponse.srcIPv4, srcIPAddress,INET_ADDRSTRLEN);
             if (convResult == nullptr) {
-                throw RawSocketException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
+                throw ConversionToIPStringException();
             }
 
             // Anti Tampering and Packet Integrity Checks

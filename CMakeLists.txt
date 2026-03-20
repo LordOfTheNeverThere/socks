@@ -16,19 +16,14 @@ add_executable(socks_dev
         include/socks/AddressInfo.h
         include/socks/types.h
         include/socks/NetworkListener.h
-        include/socks/GenericException.h
-        include/socks/NameResolutionException.h
-        include/socks/ServerSocketException.h
-        include/socks/ClientSocketException.h
+        include/socks/Exceptions.h
         include/socks/L4Socket.h
         include/socks/RawSocket.h
-        include/socks/RawSocketException.h
         include/socks/Tools.h
         include/socks/Socket.h
         include/socks/IPv4Header.h
         include/socks/IPv4ToMACARPPacket.h
         include/socks/LocalHost.h
-        include/socks/HostException.h
         include/socks/InternalInterface.h
         include/socks/ExternalInterface.h
 )

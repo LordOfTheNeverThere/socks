@@ -10,6 +10,7 @@
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 
+#include "Exceptions.h"
 #include "types.h"
 
 class IPv4Header {
@@ -20,18 +21,12 @@ public:
 
     IPv4Header(void* buffer) {
         if (buffer == nullptr) {
-            throw RawSocketException("IPv4Header Constructor requires a non-null buffer.");
+            throw IPv4HeaderNullBufferException();
         }
         header = reinterpret_cast<struct ip*>(buffer);
     }
 
-    IPv4Header(void* buffer, const char* srcIP, const char* destIP, uint16_t packetSize, Int protocol) {
-
-        if (buffer == nullptr) {
-            throw RawSocketException("IPv4Header Constructor requires a non-null buffer.");
-        }
-
-        header = reinterpret_cast<struct ip*>(buffer);
+    IPv4Header(void* buffer, const char* srcIP, const char* destIP, uint16_t packetSize, Int protocol) : IPv4Header(buffer) {
         setVersion(4);
         setIHL(5);              // Standard 20-byte header(naked of options)
         setTotalLength(packetSize);
@@ -54,7 +49,7 @@ public:
     std::string getSourceStr() const {
         char buffer[INET_ADDRSTRLEN];
         if (inet_ntop(AF_INET, &(header->ip_src), buffer, INET_ADDRSTRLEN) == nullptr) {
-            throw RawSocketException("Unable to convert source IP address to Human Readable string.\nReason:\n " + std::system_category().message(errno));
+            throw ConversionToIPStringException();
         }
         return std::string(buffer);
     }
@@ -62,7 +57,7 @@ public:
     std::string getDestStr() const {
         char buffer[INET_ADDRSTRLEN];
         if (inet_ntop(AF_INET, &(header->ip_dst), buffer, INET_ADDRSTRLEN) == nullptr) {
-            throw RawSocketException("Unable to convert destination IP address to Human Readable string.\nReason:\n " + std::system_category().message(errno));
+            throw ConversionToIPStringException();
         }
         return std::string(buffer);
     }
@@ -77,6 +72,7 @@ public:
     void setChecksum(uint16_t c)     { header->ip_sum = htons(c); }
 
     void setSource(const char* ip) {
+
         inet_pton(AF_INET, ip, &(header->ip_src));
     }
 

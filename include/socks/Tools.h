@@ -14,7 +14,7 @@
 #include <linux/if_ether.h>
 #include <netinet/in.h>
 #include <netpacket/packet.h>
-#include "GenericException.h"
+#include "Exceptions.h"
 #include "types.h"
 
 class Tools {
@@ -74,20 +74,20 @@ class Tools {
             return hexDigit - 'A' + 10;
         } else {
             std::string hexDigitInString {hexDigit};
-            throw GenericException("Unknown Hexadecimal digit " + hexDigitInString);
+            throw WrongHexDigitFormat(hexDigitInString);
         }
     }
 
     static uint8_t fromHexByteStringToUInt8(const std::string& hexByte) {
         if (hexByte.size() != 2) {
-            throw GenericException("cannot convert an hexadecimal string " + hexByte + " to uint8_t since it is " + std::to_string(hexByte.size()) + " characters long");
+            throw WrongHexByteFormat(hexByte);
         }
         return (hexToUInt8(hexByte[0]) << 4) + hexToUInt8(hexByte[1]);
     }
 
     static std::array<uint8_t, 6> stringToMac(const std::string& macAddress) {
         if (macAddress.size() != 12) {
-            throw GenericException("The stringToMac utility function only allows strings with 12 characters. So no other delimiter characters are allowed");
+            throw WrongMACFormat(macAddress);
         }
         std::array<uint8_t, 6> result {};
         for (Int i = 0; i < macAddress.size(); i = i + 2) {

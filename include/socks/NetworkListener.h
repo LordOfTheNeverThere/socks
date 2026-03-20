@@ -13,7 +13,7 @@
 #include <arpa/inet.h>
 
 #include "AddressInfo.h"
-#include "NameResolutionException.h"
+#include "Exceptions.h"
 #include "types.h"
 
 class NetworkListener {
@@ -40,12 +40,18 @@ private:
             if (ite->ai_family == AF_INET) {
                 sockaddr_in* ipPtr {};
                 ipPtr = reinterpret_cast<sockaddr_in*>(ite->ai_addr);
-                inet_ntop(ite->ai_family, &ipPtr->sin_addr, ipNameBuffer, ite->ai_addrlen);
+                const char* convResult = inet_ntop(ite->ai_family, &ipPtr->sin_addr, ipNameBuffer, ite->ai_addrlen);
+                if (convResult == nullptr) {
+                    throw ConversionToIPStringException();
+                }
                 interface.port = ntohs(ipPtr->sin_port);
             } else if (ite->ai_family == AF_INET6) {
                 sockaddr_in6* ipPtr {};
                 ipPtr = reinterpret_cast<sockaddr_in6*>(ite->ai_addr);
-                inet_ntop(ite->ai_family, &ipPtr->sin6_addr, ipNameBuffer, ite->ai_addrlen);
+                const char* convResult = inet_ntop(ite->ai_family, &ipPtr->sin6_addr, ipNameBuffer, ite->ai_addrlen);
+                if (convResult == nullptr) {
+                    throw ConversionToIPStringException();
+                }
                 interface.port = ntohs(ipPtr->sin6_port);
             } else {
                 std::string ipNameBuffer = "Undefined";
@@ -75,8 +81,8 @@ public:
         const Int status = getaddrinfo(hostname.c_str(), port.c_str(), &hints, &result);
 
         if ( status != 0 || result == nullptr) {
-            std::string error {"The name resolution was not able to find any viable interfaces for the socket connection to " + hostname + " on port: " + port + " and IP version: " + std::to_string(ipVersion) + ".\n" + "Prompting the error with status code: " + gai_strerror(status)};
-            throw NameResolutionException(error);
+            std::string error {};
+            throw NameResolutionException(hostname,ipVersion,port,status);
         }
         loadInterfaces(result);
     };
@@ -90,9 +96,9 @@ public:
         addrinfo *result = nullptr;
         const Int status = getaddrinfo(nullptr, port.c_str(), &hints, &result);
 
-        if ( status != 0 || result == nullptr) { // Resolve localhost's name and return available interfaces
-            std::string error {"The name resolution was not able to find any viable interfaces for the socket connection to localhost on port: " + port + " and IP version: " + std::to_string(ipVersion) + ".\n" + "Prompting the error with status code: " + gai_strerror(status)};
-            throw NameResolutionException(error);
+        if ( status != 0 || result == nullptr) {
+            std::string error {};
+            throw NameResolutionException("localhost",ipVersion,port,status);
         }
         loadInterfaces(result);
     };

@@ -7,8 +7,7 @@
 #include <netinet/in.h>
 #include <algorithm>
 
-#include "GenericException.h"
-#include "HostException.h"
+#include "Exceptions.h"
 #include "IPv4ToMACARPPacket.h"
 #include "Tools.h"
 
@@ -98,7 +97,7 @@ public:
 
     void setMacAddress(const std::string &macAddress) {
         if (macAddress.size() != 12) {
-            throw GenericException("Mac addresses must be 12 characters long");
+            throw WrongMACFormat(macAddress);
         }
         m_macAddress = macAddress;
         std::transform(m_macAddress.begin(), m_macAddress.end(), m_macAddress.begin(), ::toupper);
@@ -112,7 +111,7 @@ public:
             char srcIPAddress[INET_ADDRSTRLEN] {};
             const char* convResult = inet_ntop(AF_INET, &arpResponse.srcIPv4, srcIPAddress,INET_ADDRSTRLEN);
             if (convResult == nullptr) {
-                throw HostException("Conversion of the received packet's IP address was unsuccessful. \n Reason: \n" + std::system_category().message(errno));
+                throw ConversionToIPStringException();
             }
             setIPAddress(srcIPAddress);
         } else {
@@ -124,44 +123,66 @@ public:
         setMacAddress(Tools::macToString(ethernetHeaderResponse.ether_shost));
     }
 
+    bool belongsToSubnetIPv6(const in6_addr& ipAddr) const {
+        if (m_networkMask.empty()) {
+            throw MissingMaskException(m_macAddress);
+        }
+        Int result {0};
+
+        in6_addr maskInBytes {};
+        in6_addr ipInterfaceInBytes{};
+
+        result = inet_pton(m_ipVersion, m_networkMask.c_str(), &maskInBytes);
+        if (result != 1) throw  ConversionToIPBinaryException(m_networkMask);
+        result = inet_pton(m_ipVersion, m_ipAddress.c_str(), &ipInterfaceInBytes);
+        if (result != 1) throw  ConversionToIPBinaryException(m_ipAddress);
+
+        return Tools::belongsToSubnetIPv6(ipAddr, ipInterfaceInBytes, maskInBytes);
+
+    }
+
+    bool belongsToSubnetIPv4(const uint32_t ipInBits) const {
+        if (m_networkMask.empty()) {
+            throw MissingMaskException(m_macAddress);
+        }
+
+        Int result {0};
+
+        in_addr maskInBytes {};
+        in_addr ipInterfaceInBytes{};
+
+        result = inet_pton(m_ipVersion, m_networkMask.c_str(), &maskInBytes);
+        if (result != 1) throw  ConversionToIPBinaryException(m_networkMask);
+        result = inet_pton(m_ipVersion, m_ipAddress.c_str(), &ipInterfaceInBytes);
+        if (result != 1) throw  ConversionToIPBinaryException(m_ipAddress);
+
+        return Tools::belongsToSubnetIPv4(ipInBits, ipInterfaceInBytes.s_addr, maskInBytes.s_addr);
+    }
+
 
     bool belongsToSubnet(const std::string& ip) const {
         if (m_networkMask.empty()) {
-            throw HostException("Cannot check if the interface with IP  " + m_ipAddress + " belongs to the same network as "
-                + ip + " since the interface has no network mask defined.");
+            throw MissingMaskException(m_macAddress);
         }
         bool belongsToSubnet {false};
 
         if (m_ipVersion == AF_INET) {
-            Int result {0};
             in_addr ipInBytes {};
-            in_addr maskInBytes {};
-            in_addr ipInterfaceInBytes{};
-
-            result += inet_pton(m_ipVersion, ip.c_str(), &ipInBytes);
-            result += inet_pton(m_ipVersion, m_networkMask.c_str(), &maskInBytes);
-            result += inet_pton(m_ipVersion, m_ipAddress.c_str(), &ipInterfaceInBytes);
-
-            if (result != 3) {
-                throw HostException("It was not possible to convert the addresses into its binary form from string \nReason:\n " + std::system_category().message(errno));
+            Int result = inet_pton(m_ipVersion, ip.c_str(), &ipInBytes);
+            if (result != 1) {
+                throw  ConversionToIPBinaryException(ip);
             }
 
-            belongsToSubnet = Tools::belongsToSubnetIPv4(ipInBytes.s_addr, ipInterfaceInBytes.s_addr, maskInBytes.s_addr);
+            belongsToSubnet = belongsToSubnetIPv4(ipInBytes.s_addr);
 
         } else if (m_ipVersion == AF_INET6) {
-            Int result {0};
             in6_addr ipInBytes {};
-            in6_addr maskInBytes {};
-            in6_addr ipInterfaceInBytes{};
-
-            result += inet_pton(m_ipVersion, ip.c_str(), &ipInBytes);
-            result += inet_pton(m_ipVersion, m_networkMask.c_str(), &maskInBytes);
-            result += inet_pton(m_ipVersion, m_ipAddress.c_str(), &ipInterfaceInBytes);
-
-            if (result != 3) {
-                throw HostException("It was not possible to convert the addresses into its binary form from string \nReason:\n " + std::system_category().message(errno));
+            Int result = inet_pton(m_ipVersion, ip.c_str(), &ipInBytes);
+            if (result != 1) {
+                throw  ConversionToIPBinaryException(ip);
             }
-            belongsToSubnet = Tools::belongsToSubnetIPv6(ipInBytes, ipInterfaceInBytes, maskInBytes);
+
+            belongsToSubnet = belongsToSubnetIPv6(ipInBytes);
         }
         return belongsToSubnet;
     }
