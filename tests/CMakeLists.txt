@@ -8,7 +8,6 @@ add_executable(sudoSocksTests
         LocalHost.cpp
 )
 
-
 target_link_libraries(socksTests
         PRIVATE
         socks

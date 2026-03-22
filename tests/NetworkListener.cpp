@@ -132,7 +132,7 @@ TEST(MethodChecking, twoClientAndServerMock) {
             L4Socket serverSocket =  L4Socket(server, true);
             serverSocket.send(outgoing, 5, 5, true, connectionTimeout);
 
-        } catch (std::runtime_error caught) {
+        } catch (std::runtime_error& caught) {
             std::cerr << caught.what() << "\n";
         }
         exit(0);

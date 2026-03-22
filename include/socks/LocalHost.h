@@ -116,7 +116,7 @@ public:
                 return interface;
             }
         }
-        return InternalInterface();
+        return {};
     }
 
     InternalInterface getInterfaceFromSubnetIPv4(const uint32_t ipInBits) const {
@@ -125,7 +125,7 @@ public:
                 return interface;
             }
         }
-        return InternalInterface();
+        return {};
     }
 
     InternalInterface getInterfaceFromSubnet(const std::string& ip, const sa_family_t& ipVersion) {
@@ -134,7 +134,7 @@ public:
                 return interface;
             }
         }
-        return InternalInterface();
+        return {};
     }
 };
 

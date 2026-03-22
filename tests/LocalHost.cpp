@@ -22,6 +22,7 @@ TEST(MethodChecking, findAnInterfaceBelongingToANetworkIPv4) {
     EXPECT_NE(interfaceWithGateway.getIPAddress(), "");
     EXPECT_NE(interfaceWithGateway.getNetworkMask(), "");
     EXPECT_NE(interfaceWithGateway.getMacAddress(), "");
+    EXPECT_NE(interfaceWithGateway.getMacVendor(), "Unknown Vendor");
 }
 
 TEST(MethodChecking, findAnInterfaceBelongingToANetworkIPv6) {

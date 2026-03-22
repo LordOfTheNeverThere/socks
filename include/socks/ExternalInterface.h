@@ -34,7 +34,7 @@ private:
     }
 
     void populateNameFromVendor() {
-        std::ifstream ouiFile("../../resources/oui.txt");
+        std::ifstream ouiFile("resources/oui.txt");
         std::string lineBuffer {};
         std::string name {};
         std::string oui {};

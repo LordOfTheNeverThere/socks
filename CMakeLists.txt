@@ -28,6 +28,8 @@ add_executable(socks_dev
         include/socks/ExternalInterface.h
 )
 
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/resources" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/resources" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/tests")
 target_link_libraries(socks_dev PRIVATE socks)
 
 

@@ -133,11 +133,11 @@ class Tools {
         return "No default gateway found";
     }
 
-    static bool belongsToSubnetIPv4(const uint32_t ipQuery, const uint32_t ip, const uint32_t mask) {
+    static bool belongsToSubnetIPv4(const uint32_t ipQuery, const uint32_t ip, const uint32_t mask) { // Endiness Agnostic
         return (ipQuery & mask)==(ip & mask);
     }
 
-    static bool belongsToSubnetIPv6(const in6_addr& ipQuery, const in6_addr& ip, const in6_addr& mask) {
+    static bool belongsToSubnetIPv6(const in6_addr& ipQuery, const in6_addr& ip, const in6_addr& mask) { // Endiness Agnostic
         for (int i = 0; i < 16; ++i) {
             if ((ipQuery.s6_addr[i] & mask.s6_addr[i]) != (ip.s6_addr[i] & mask.s6_addr[i])) {
                 return false;
@@ -146,13 +146,22 @@ class Tools {
         return true;
     }
 
-    static uint32_t getNumberOfIPsInMaskIPv4(uint32_t& maskInBits) {return ~(maskInBits);}
+    static uint32_t getNumberOfIPsInMaskIPv4(const uint32_t maskInBits) {return ~(ntohl(maskInBits)) + 1;} // Little Endian Only
 
 
-    static void generateIPv4Range(const uint32_t& ipInBits, const uint32_t& maskInBits, std::vector<uint32_t>& resultVector) {
-        for (uint32_t i = 0; i <= ~maskInBits; ++i) {
-            resultVector.push_back((ipInBits & maskInBits) | i);
+    static std::vector<uint32_t> generateIPv4RangeHostEndiness( uint32_t ipInBits,  uint32_t maskInBits) { // Little Endian Only
+
+        uint32_t numberOfIPs {Tools::getNumberOfIPsInMaskIPv4(maskInBits)};
+        std::vector<uint32_t> resultVector {};
+        resultVector.reserve(numberOfIPs);
+        // For calculations
+        ipInBits = ntohl(ipInBits);
+        maskInBits = ntohl(maskInBits);
+
+        for (uint32_t i = 0; i < numberOfIPs; ++i) {
+            resultVector.push_back(htonl((ipInBits & maskInBits) | i));
         }
+        return resultVector;
     }
 
 };
