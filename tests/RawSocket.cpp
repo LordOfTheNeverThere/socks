@@ -1,4 +1,6 @@
 #include "socks/RawSocket.h"
+
+#include <thread>
 #include <netinet/ip_icmp.h>
 #include "gtest/gtest.h"
 #include "socks/LocalHost.h"
@@ -137,4 +139,24 @@ TEST(MethodChecking, sendReceiveARPPingWithIPQuery) {
     inet_ntop(AF_INET, &arpResponse.srcIPv4, srcIPAddressThatWasReceived,INET_ADDRSTRLEN);
 
     EXPECT_TRUE(strcmp(srcIPAddressThatWasReceived, destinationIP.c_str()) == 0);
+}
+
+TEST(MethodChecking, sendReceiveARPPingFromDifferentInterface) {
+
+
+    std::string cmdOutput {};
+    bool run {true};
+    std::string cmd = "tcpdump -i lo -n ether host ff:ff:ff:ff:ff:ff -c1";
+    std::thread worker(Tools::getOutputFromCommand, std::ref(cmdOutput), std::cref(cmd), std::ref(run));
+
+    LocalHost myMachine {true};
+
+    RawSocket socket {AF_PACKET, htons(ETH_P_ARP)};
+    socket.sendArpEchoRequest("172.17.0.5", "0e91a2105432", "172.17.0.1", "lo");
+
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    run = false;
+    worker.join();
+
+    EXPECT_EQ(cmdOutput.substr(cmdOutput.find("ARP", 0), std::string::npos), "ARP, Request who-has 172.17.0.5 tell 172.17.0.1, length 28\n");
 }

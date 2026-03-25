@@ -45,10 +45,8 @@ public:
         }
         std::map<std::string, std::string> macAddresses {};
 
-        // Get MAC Addresses and UP NON LOOPBACK interfaces
         for (ifaddrs *ptrToInterface = interfaceAddresses; ptrToInterface != nullptr; ptrToInterface = ptrToInterface->ifa_next) {
             if (ptrToInterface->ifa_addr !=nullptr
-            && (ptrToInterface->ifa_flags & IFF_LOOPBACK) != IFF_LOOPBACK
             && (ptrToInterface->ifa_flags & IFF_UP) == IFF_UP
             && ptrToInterface->ifa_addr->sa_family == AF_PACKET) {
 
@@ -131,6 +129,15 @@ public:
     InternalInterface getInterfaceFromSubnet(const std::string& ip, const sa_family_t& ipVersion) {
         for (auto interface: m_interfaces) {
             if (ipVersion == interface.getIPVersion() && interface.belongsToSubnet(ip)) {
+                return interface;
+            }
+        }
+        return {};
+    }
+
+    InternalInterface getInterfaceByName(const std::string& interfaceName) {
+        for (auto interface: m_interfaces) {
+            if (interface.getInterfaceName() == interfaceName) {
                 return interface;
             }
         }

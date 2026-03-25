@@ -121,6 +121,7 @@ public:
         ether_header ethernetHeaderResponse {};
         std::memcpy(&ethernetHeaderResponse, reply, sizeof(ether_header));
         setMacAddress(Tools::macToString(ethernetHeaderResponse.ether_shost));
+        setIPVersion(AF_INET);
     }
 
     bool belongsToSubnetIPv6(const in6_addr& ipAddr) const {

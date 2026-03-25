@@ -22,7 +22,7 @@
 #include "LocalHost.h"
 
 
-class RawSocket : private Socket {
+class RawSocket : public Socket {
 
 private:
     Int m_ipVersion {0};
@@ -211,9 +211,11 @@ public:
         return sizeof(ether_header) + sizeof(IPv4ToMACARPPacket);
     }
 
-    size_t sendArpEchoRequest(const uint32_t dstIPInBits, const std::array<uint8_t,6>& srcMACAddrBytes, const uint32_t srcIPInBits,
-        std::array<uint8_t,6> dstMACAddrBytes, const std::string& srcInterfaceName) {
+    size_t sendArpEchoRequest(const uint32_t dstIPInBits, const std::string& srcMacAddress, const uint32_t srcIPInBits, const std::string& srcInterfaceName) const {
 
+        std::array<uint8_t,6> srcMACAddrBytes = Tools::stringToMac(srcMacAddress);
+        std::array<uint8_t,6> dstMACAddrBytes {};
+        dstMACAddrBytes.fill(std::numeric_limits<uint8_t>::max());
         sockaddr_ll destination {};
         destination.sll_family = AF_PACKET;
         destination.sll_protocol = htons(ETH_P_ARP);
@@ -234,7 +236,6 @@ public:
         } else if (bytesToSend != sent) {
             throw SendingException(bytesToSend, sent);
         }
-
         return sent;
     }
 
@@ -256,13 +257,10 @@ public:
             throw ConversionToIPBinaryException(srcIPAddress);
         }
 
-        std::array<uint8_t,6> dstMACAddrBytes {};
-        dstMACAddrBytes.fill(std::numeric_limits<uint8_t>::max());
-        std::array<uint8_t,6> srcMACAddrBytes = Tools::stringToMac(srcMacAddress);
-        return sendArpEchoRequest(dstIPAddressNum, srcMACAddrBytes, srcIPAddressNum, dstMACAddrBytes, srcInterfaceName);
+        return sendArpEchoRequest(dstIPAddressNum, srcMacAddress, srcIPAddressNum, srcInterfaceName);
     }
 
-    void receiveArpEchoReply(uint8_t recvBuffer[ETH_FRAME_LEN], const std::string originIP = "") {
+    int64_t receiveArpEchoReply(uint8_t recvBuffer[ETH_FRAME_LEN], const std::string originIP = "") const {
         if (m_ipVersion != AF_PACKET) {
             throw UnsupportedAFTypeException(m_ipVersion);
         }
@@ -270,10 +268,12 @@ public:
         socklen_t originAddrLen = sizeof(origin);
 
         bool acceptPacket = false;
-
+        int64_t numBytesRecv {};
         while (!acceptPacket) {
-            int64_t numBytesRecv = recvfrom(m_socket, recvBuffer, ETH_FRAME_LEN, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
-            if (numBytesRecv == -1) {
+            numBytesRecv = recvfrom(m_socket, recvBuffer, ETH_FRAME_LEN, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
+            if (numBytesRecv == -1 && (errno == EWOULDBLOCK | errno == EAGAIN)) {
+                return 0;
+            } else if (numBytesRecv == -1) {
                 throw ReceivingException();
             }
 
@@ -297,6 +297,7 @@ public:
             && (ntohs(arpResponse.hardAddrFormat) == ARPHRD_ETHER) && (ntohs(arpResponse.protoAddrFormat) == ETH_P_IP)
             && origin.sll_pkttype == PACKET_HOST;
         }
+        return numBytesRecv;
     }
 };
 

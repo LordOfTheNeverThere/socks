@@ -5,6 +5,7 @@
 #ifndef SOCKS_TOOLS_H
 #define SOCKS_TOOLS_H
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <fstream>
 #include <array>
@@ -163,6 +164,35 @@ class Tools {
         }
         return resultVector;
     }
+
+
+
+
+
+    static void getOutputFromCommand(std::string& output, const std::string& cmd, bool& continueRunning) {
+
+        FILE* pipe = popen(cmd.c_str(), "r");
+
+        if (!pipe) {
+            output = "Failed to run command.";
+            pclose(pipe);
+            return;
+        }
+        try {
+
+            char buffer[5000] {};
+            while (continueRunning) {
+                while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+                    output += buffer;
+                    //std::cout << "Captured the output " << buffer << '\n';
+                }
+            }
+        } catch (...) {
+            pclose(pipe);
+        }
+        pclose(pipe);
+    }
+
 
 };
 

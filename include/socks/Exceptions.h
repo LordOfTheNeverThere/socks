@@ -124,6 +124,30 @@ public:
         : SystemCallException("The setting of the socket option " + std::to_string(option) + " failed.\nReason:\n" + std::system_category().message(errno)) {}
 };
 
+class FileDescriptorOptionException : public SystemCallException {
+public:
+    FileDescriptorOptionException(const Int option)
+        : SystemCallException("The setting of the file descriptor option " + std::to_string(option) + " failed.\nReason:\n" + std::system_category().message(errno)) {}
+};
+
+class EpollCreationException : public SystemCallException {
+public:
+    EpollCreationException()
+        : SystemCallException("The creation of the epoll file descriptor failed! \n Reason: \n" + std::system_category().message(errno)) {}
+};
+
+class EpollControllerException : public SystemCallException {
+public:
+    EpollControllerException(const Int& operation)
+        : SystemCallException("The operation "+  std::to_string(operation) +" on epoll failed ! \n Reason: \n" + std::system_category().message(errno)) {}
+};
+
+class EpollWaitException : public SystemCallException {
+public:
+    EpollWaitException()
+        : SystemCallException("There was an error while waiting for the epoll file descriptor! \n Reason: \n" + std::system_category().message(errno)) {}
+};
+
 class InterfaceNotFoundByName : public SystemCallException {
 public:
     InterfaceNotFoundByName(const std::string& name)

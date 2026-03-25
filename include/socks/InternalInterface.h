@@ -27,7 +27,7 @@ public:
 
     InternalInterface()=default;
 
-    std::string getInterfaceName() {
+    std::string getInterfaceName() const {
         return m_interfaceName;
     }
 
