@@ -95,7 +95,7 @@ public:
         m_timelapse = timelapse;
     }
 
-    uint64_t getTimelapse() {   // In Nanosecond
+    uint64_t getTimelapse() const {   // In Nanosecond
         return m_timelapse;
     }
 
@@ -218,7 +218,12 @@ public:
 };
 
 inline std::ostream& operator<<(std::ostream& os, const ExternalInterface& host) {
-    os << "MAC-Vendor: " << host.getMacVendor() << '\n' << "IP Address: " << host.getIPAddress() <<  '\n' << "MAC: " << host.getMacAddress() << '\n';
+    if (!host.getMacAddress().empty()) { // Local
+        os << "MAC-Vendor: " << host.getMacVendor() << '\n' << "MAC: " << host.getMacAddress() << '\n';
+    } else { // Non-Local
+        os << "Ping Timelapse (ns): " << host.getTimelapse() << '\n';
+    }
+    os << "IP Address: " << host.getIPAddress() <<  '\n';
     return os;
 }
 
