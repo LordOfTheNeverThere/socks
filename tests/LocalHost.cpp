@@ -67,3 +67,24 @@ TEST(MethodChecking, PopulateHostFromARP) {
     EXPECT_NE(externalHost.getMacVendor(), "");
     EXPECT_NE(externalHost.getMacAddress(), "");
 }
+
+
+TEST(MethodChecking, PopulateHostFromPing) {
+
+    LocalHost myMachine {true};
+    std::string destinationIP {Tools::getDefaultGateway()};
+    InternalInterface interfaceWithGateway = myMachine.getInterfaceFromSubnet(destinationIP, AF_INET);
+    std::string senderIP {interfaceWithGateway.getIPAddress()};
+
+    RawSocket socket {AF_INET, IPPROTO_ICMP};
+    socket.sendPing(destinationIP);
+
+    uint8_t packet[IP_MAXPACKET] {};
+    socket.receivePing(packet, destinationIP, 0 , 0);
+
+    ExternalInterface gateway {};
+    gateway.populateFromICMPEchoReply(packet);
+
+    EXPECT_TRUE( gateway.getTimelapse() < 5000000000); // less than 5 seconds have passed
+    EXPECT_EQ(destinationIP, gateway.getIPAddress());
+}

@@ -91,6 +91,15 @@ public:
         return headerSize + nanosecsSize;
     }
 
+    size_t sendPingIPv4Only(const uint32_t ipNum, const uint16_t& seqNum = 0, const uint16_t& processIDNum = 0) {
+        sockaddr_storage destination {};
+        sockaddr_in *ipv4View = reinterpret_cast<sockaddr_in *>(&destination);
+        ipv4View->sin_addr.s_addr = ipNum;
+        ipv4View->sin_family = m_ipVersion;
+
+        return sendPing(destination, seqNum, processIDNum);
+    }
+
     size_t sendPing(sockaddr_storage& destination, const uint16_t& seqNum = 0, const uint16_t& processIDNum = 0) {
 
         const size_t headerSize = sizeof(icmphdr); //use icmphdr instead of icmp for requests, icmp has part of the IP header which caused the host to reply with an error, since this is request it is nonsensical to include it here
@@ -141,14 +150,14 @@ public:
        return sendPing(destination, seqNum, processIDNum);
     }
 
-    void receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "", const Int& seqNum = 0,  const Int& processIDNum = 0) const {
+    int64_t receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "", const Int& seqNum = 0,  const Int& processIDNum = 0) const {
         sockaddr_storage origin {};
         socklen_t originAddrLen = sizeof(origin);
 
         bool acceptPacket = false;
-
+        int64_t numBytesRecv{};
         while (!acceptPacket) {
-            int64_t numBytesRecv = recvfrom(m_socket, packet, IP_MAXPACKET, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
+            numBytesRecv = recvfrom(m_socket, packet, IP_MAXPACKET, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
             if (numBytesRecv == -1) {
                 throw ReceivingException();
             }
@@ -187,6 +196,7 @@ public:
             && (processIDNum == 0  || processIDNum == ntohs(ICMPHeaderReceive.un.echo.id))
             && ICMPHeaderReceive.type == ICMP_ECHOREPLY;
         }
+        return numBytesRecv;
     }
 
     static size_t constructARPEchoRequestPacket(uint8_t* packet, const uint32_t& dstIPAddress,

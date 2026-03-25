@@ -6,8 +6,10 @@
 #include <net/ethernet.h>
 #include <netinet/in.h>
 #include <algorithm>
+#include <netinet/ip_icmp.h>
 
 #include "Exceptions.h"
+#include "IPv4Header.h"
 #include "IPv4ToMACARPPacket.h"
 #include "Tools.h"
 
@@ -20,6 +22,7 @@ private:
     std::string m_macAddress {};
     std::string m_networkMask {};
     sa_family_t m_ipVersion{};
+    uint64_t m_timelapse {};    // In Nanosecond
 
     void clearAttributes() {
         m_macVendor = "";
@@ -27,6 +30,7 @@ private:
         m_macAddress = "";
         m_networkMask = "";
         m_ipVersion = 0;
+        m_timelapse = 0;
     }
 
     std::string getOUI() {
@@ -87,6 +91,14 @@ public:
         return m_ipVersion;
     }
 
+    void setTimelapse(const uint64_t& timelapse) {  // In Nanosecond
+        m_timelapse = timelapse;
+    }
+
+    uint64_t getTimelapse() {   // In Nanosecond
+        return m_timelapse;
+    }
+
     void setIPVersion(const sa_family_t& ipVersion) {
         m_ipVersion = ipVersion;
     }
@@ -123,6 +135,22 @@ public:
         setMacAddress(Tools::macToString(ethernetHeaderResponse.ether_shost));
         setIPVersion(AF_INET);
     }
+
+
+    void populateFromICMPEchoReply(const uint8_t* reply) {
+        uint8_t ipHeaderReceiveBuffer[sizeof(ip)] {};
+        std::memcpy(ipHeaderReceiveBuffer, reply, sizeof(ip));
+        IPv4Header ipHeaderReceive {ipHeaderReceiveBuffer};
+
+        setIPAddress(ipHeaderReceive.getSourceStr());
+        setIPVersion(ipHeaderReceive.getVersion());
+        uint64_t timelapse {};
+        std::memcpy(&timelapse, reply + sizeof(ip) + sizeof(icmphdr), sizeof(timelapse));
+        uint64_t currNanosecs = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now()).time_since_epoch().count();
+
+        setTimelapse(currNanosecs - be64toh(timelapse));
+    }
+
 
     bool belongsToSubnetIPv6(const in6_addr& ipAddr) const {
         if (m_networkMask.empty()) {
