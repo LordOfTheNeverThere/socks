@@ -6,6 +6,9 @@
 #define SOCKS_SOCKET_H
 #include "types.h"
 #include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/sockios.h>
+#include <unistd.h>
 
 #include "Exceptions.h"
 
@@ -60,6 +63,29 @@ public:
             }
         }
     }
+
+    uint64_t getSocketSndBuffer() const {
+        uint64_t bufferSize{};
+        socklen_t bufferVarSize{sizeof(bufferSize)};
+        getsockopt(m_socket, SOL_SOCKET, SO_SNDBUF, &bufferSize, &bufferVarSize);
+        return bufferSize;
+    }
+
+    uint64_t getSocketRcvBuffer() const {
+        uint64_t bufferSize{};
+        socklen_t bufferVarSize{sizeof(bufferSize)};
+        getsockopt(m_socket, SOL_SOCKET, SO_RCVBUF, &bufferSize, &bufferVarSize);
+        return bufferSize;
+    }
+
+
+    uint64_t getSocketOverflowDrops() const {
+        uint64_t drops{};
+        socklen_t dropsVarSize{sizeof(drops)};
+        getsockopt(m_socket, SOL_SOCKET, SO_RXQ_OVFL, &drops, &dropsVarSize);
+        return drops;
+    }
+
 
     ~Socket() {
         close(m_socket);

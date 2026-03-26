@@ -47,6 +47,7 @@ public:
 
         for (ifaddrs *ptrToInterface = interfaceAddresses; ptrToInterface != nullptr; ptrToInterface = ptrToInterface->ifa_next) {
             if (ptrToInterface->ifa_addr !=nullptr
+            && (ptrToInterface->ifa_flags & IFF_LOOPBACK) != IFF_LOOPBACK
             && (ptrToInterface->ifa_flags & IFF_UP) == IFF_UP
             && ptrToInterface->ifa_addr->sa_family == AF_PACKET) {
 
