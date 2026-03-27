@@ -166,8 +166,7 @@ TEST(MethodChecking, sendPingIPv4Only) {
 
     LocalHost myMachine {true};
     std::string destinationIP {"127.0.0.2"};
-    InternalInterface interfaceWithGateway = myMachine.getInterfaceFromSubnet(destinationIP, AF_INET);
-    std::string senderIP {interfaceWithGateway.getIPAddress()};
+    std::string senderIP {"127.0.0.1"};
 
     RawSocket socket {AF_INET, IPPROTO_ICMP};
     uint32_t ipInBytes {};
@@ -182,7 +181,6 @@ TEST(MethodChecking, sendPingIPv4Only) {
     nanosecs = be64toh(nanosecs);
     uint64_t currNanosecs = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now()).time_since_epoch().count();
     EXPECT_TRUE(currNanosecs - nanosecs < 5000000000); // There was at most a 5 second gap between the time the request was sent and the reply fetched
-    std::cout << currNanosecs << '\n' << nanosecs << '\n';
 
     uint8_t ipHeaderReceiveBuffer[sizeof(ip)] {};
     memcpy(&ipHeaderReceiveBuffer,packet, sizeof(ip));
