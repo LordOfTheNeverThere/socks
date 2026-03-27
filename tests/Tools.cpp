@@ -70,10 +70,10 @@ TEST(MethodChecking, getNumericValueOfIPAddr) {
 TEST(MethodChecking, checkIfNetworkMaskIsValid) {
     uint32_t wrongNetworkMask{};
     inet_pton(AF_INET, "255.1.255.128", &wrongNetworkMask);
-    EXPECT_FALSE(Tools::checkIfNetworkMaskIsValid(ntohl(wrongNetworkMask)));
+    EXPECT_FALSE(Tools::checkIfNetworkMaskIsValid(wrongNetworkMask));
 
     uint32_t correctNetworkMask{};
     inet_pton(AF_INET, "255.255.0.0", &correctNetworkMask);
-    EXPECT_TRUE(Tools::checkIfNetworkMaskIsValid(ntohl(correctNetworkMask)));
+    EXPECT_TRUE(Tools::checkIfNetworkMaskIsValid(correctNetworkMask));
 }
 

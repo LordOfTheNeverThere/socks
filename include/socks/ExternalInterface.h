@@ -62,9 +62,11 @@ public:
     ExternalInterface(const std::string& ipAddress, const sa_family_t& ipVersion, const std::string& networkMask,  const std::string& macAddress)
     :
     m_ipAddress {ipAddress},
-    m_ipVersion {ipVersion},
-    m_networkMask {networkMask}
-    {setMacAddress(macAddress);}
+    m_ipVersion {ipVersion}
+    {
+        setMacAddress(macAddress);
+        setNetworkMask(networkMask);
+    }
 
     ExternalInterface()=default;
 
@@ -85,6 +87,9 @@ public:
     }
 
     void setNetworkMask(const std::string &networkMask) {
+        if (m_ipVersion == AF_INET && !Tools::checkIfNetworkMaskIsValid(networkMask)) {
+            throw InvalidNetworkMaskException(networkMask);
+        }
         m_networkMask = networkMask;
     }
 

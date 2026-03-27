@@ -198,6 +198,11 @@ public:
         : ConfigException("The family type with ID: " + std::to_string(addrFamType) + " is not supported.") {}
 };
 
+class InvalidNetworkMaskException : public ConfigException {
+public:
+    InvalidNetworkMaskException(const std::string& networkMask)
+        : ConfigException("The network mask " + networkMask + " is invalid.") {};
+};
 
 
 

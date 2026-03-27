@@ -177,11 +177,19 @@ class Tools {
                (static_cast<uint32_t>(secondOct)  << 16) |
                (static_cast<uint32_t>(firstOct) << 24);
     }
+    static bool checkIfNetworkMaskIsValid(const std::string& networkMaskString) {
+        uint32_t networkMask {};
+        Int result = inet_pton(AF_INET, networkMaskString.c_str(), &networkMask);
+        if (result != 1) {
+            throw ConversionToIPBinaryException(networkMaskString);
+        }
+        return checkIfNetworkMaskIsValid(networkMask);
+    }
 
-    // Host's Endiness Only
+    // Little Endian Only (Network Byte Order)
     static bool checkIfNetworkMaskIsValid(uint32_t networkMask) {
 
-        uint32_t inverted {~networkMask};
+        uint32_t inverted {~ntohl(networkMask)};
 
         return (inverted & (inverted + 1)) == 0;
     }
