@@ -59,3 +59,21 @@ TEST(MethodChecking, convertStringToMacWrongHex) {
 }, WrongHexDigitFormat);
 }
 
+TEST(MethodChecking, getNumericValueOfIPAddr) {
+    uint32_t num {Tools::getNumericValueOfIPAddr(44, 55,66, 77)};
+    uint32_t otherNum{};
+    inet_pton(AF_INET, "44.55.66.77", &otherNum);
+    EXPECT_EQ(htonl(num), otherNum);
+}
+
+
+TEST(MethodChecking, checkIfNetworkMaskIsValid) {
+    uint32_t wrongNetworkMask{};
+    inet_pton(AF_INET, "255.1.255.128", &wrongNetworkMask);
+    EXPECT_FALSE(Tools::checkIfNetworkMaskIsValid(ntohl(wrongNetworkMask)));
+
+    uint32_t correctNetworkMask{};
+    inet_pton(AF_INET, "255.255.0.0", &correctNetworkMask);
+    EXPECT_TRUE(Tools::checkIfNetworkMaskIsValid(ntohl(correctNetworkMask)));
+}
+

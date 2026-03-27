@@ -9,6 +9,8 @@
 #include <sstream>
 #include <fstream>
 #include <array>
+#include <bitset>
+#include <cmath>
 #include <vector>
 #include <arpa/inet.h>
 #include <bits/socket.h>
@@ -134,11 +136,13 @@ class Tools {
         return "No default gateway found";
     }
 
-    static bool belongsToSubnetIPv4(const uint32_t ipQuery, const uint32_t ip, const uint32_t mask) { // Endiness Agnostic
+    // Endiness Agnostic
+    static bool belongsToSubnetIPv4(const uint32_t ipQuery, const uint32_t ip, const uint32_t mask) {
         return (ipQuery & mask)==(ip & mask);
     }
 
-    static bool belongsToSubnetIPv6(const in6_addr& ipQuery, const in6_addr& ip, const in6_addr& mask) { // Endiness Agnostic
+    // Endiness Agnostic
+    static bool belongsToSubnetIPv6(const in6_addr& ipQuery, const in6_addr& ip, const in6_addr& mask) {
         for (int i = 0; i < 16; ++i) {
             if ((ipQuery.s6_addr[i] & mask.s6_addr[i]) != (ip.s6_addr[i] & mask.s6_addr[i])) {
                 return false;
@@ -146,10 +150,10 @@ class Tools {
         }
         return true;
     }
+    // Little Endian Only
+    static uint32_t getNumberOfIPsInMaskIPv4(const uint32_t maskInBits) {return ~(ntohl(maskInBits)) + 1;}
 
-    static uint32_t getNumberOfIPsInMaskIPv4(const uint32_t maskInBits) {return ~(ntohl(maskInBits)) + 1;} // Little Endian Only
-
-
+    // Little Endian Only
     static std::vector<uint32_t> generateIPv4RangeHostEndiness( uint32_t ipInBits,  uint32_t maskInBits) { // Little Endian Only
 
         uint32_t numberOfIPs {Tools::getNumberOfIPsInMaskIPv4(maskInBits)};
@@ -165,8 +169,22 @@ class Tools {
         return resultVector;
     }
 
+    // returns in host's endiness
+    static uint32_t getNumericValueOfIPAddr(uint8_t firstOct, uint8_t secondOct, uint8_t thirdOct, uint8_t fourthOct) {
 
+        return (static_cast<uint32_t>(fourthOct))       |
+               (static_cast<uint32_t>(thirdOct) << 8)  |
+               (static_cast<uint32_t>(secondOct)  << 16) |
+               (static_cast<uint32_t>(firstOct) << 24);
+    }
 
+    // Host's Endiness Only
+    static bool checkIfNetworkMaskIsValid(uint32_t networkMask) {
+
+        uint32_t inverted {~networkMask};
+
+        return (inverted & (inverted + 1)) == 0;
+    }
 
 
     static void getOutputFromCommand(std::string& output, const std::string& cmd, bool& continueRunning) {

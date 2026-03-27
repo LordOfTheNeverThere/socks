@@ -13,7 +13,6 @@
 #include "Exceptions.h"
 
 class LocalHost{
-
 private:
     std::vector<InternalInterface> m_interfaces {};
 
@@ -26,6 +25,10 @@ public:
 
     std::vector<InternalInterface> getInterfaces() {
         return m_interfaces;
+    }
+
+    void pushDataToInterfaces (const InternalInterface& interface) {
+        m_interfaces.push_back(interface);
     }
 
     void clearInterfaces() {
@@ -100,7 +103,7 @@ public:
                     }
                     interface.setNetworkMask(ipAddress);
                 }
-                m_interfaces.push_back(interface);
+                pushDataToInterfaces(interface);
             }
         }
         freeifaddrs(interfaceAddresses);
