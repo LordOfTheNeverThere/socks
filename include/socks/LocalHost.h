@@ -139,7 +139,7 @@ public:
         return {};
     }
 
-    InternalInterface getInterfaceByName(const std::string& interfaceName) {
+    InternalInterface getInterfaceByName(const std::string& interfaceName) const {
         for (auto interface: m_interfaces) {
             if (interface.getInterfaceName() == interfaceName) {
                 return interface;
