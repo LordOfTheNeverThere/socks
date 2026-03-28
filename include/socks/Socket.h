@@ -26,6 +26,20 @@ public:
         //and errno will be set to EAGAIN or EWOULDBLOCK.
     }
 
+    void setSocketAsBlock() const {
+        int flags = fcntl(m_socket, F_GETFL, 0);
+        if (flags == -1) {
+            throw FileDescriptorOptionException(0);
+        }
+
+        flags &= ~O_NONBLOCK; // clear non block flag
+        int result = fcntl(m_socket, F_SETFL, flags);
+
+        if (result == -1) {
+            throw FileDescriptorOptionException(flags);
+        }
+    }
+
     void setSocketReceiveBuffer(const uint64_t bufferSize) {
         socklen_t varSize {sizeof(bufferSize)};
         Int result {setsockopt(m_socket, SOL_SOCKET, SO_RCVBUF, &bufferSize, varSize)};

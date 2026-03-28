@@ -156,6 +156,19 @@ public:
 
         bool acceptPacket = false;
         int64_t numBytesRecv{};
+        sockaddr_storage trueOrigin{};
+
+        if (!originIP.empty()) {
+            Int conversionResult {};
+            if (m_ipVersion == AF_INET) {
+                conversionResult = inet_pton(m_ipVersion, originIP.c_str(), &(reinterpret_cast<sockaddr_in*>(&trueOrigin)->sin_addr));
+            } else if (m_ipVersion == AF_INET6) {
+                conversionResult = inet_pton(m_ipVersion, originIP.c_str(), &(reinterpret_cast<sockaddr_in6*>(&trueOrigin)->sin6_addr));
+            }
+            if (conversionResult != 1) {
+                throw ConversionToIPBinaryException(originIP);
+            }
+        }
         while (!acceptPacket) {
             numBytesRecv = recvfrom(m_socket, packet, IP_MAXPACKET, 0, reinterpret_cast<sockaddr*>(&origin), &originAddrLen);
             if (numBytesRecv == -1) {
@@ -170,25 +183,13 @@ public:
 
 
             if (!originIP.empty() && m_ipVersion == AF_INET) {
-
-                char recvIPBuffer[INET_ADDRSTRLEN] {};
-                const char *convResult = inet_ntop(m_ipVersion,
-                                                   &(reinterpret_cast<sockaddr_in *>(&origin)->sin_addr),
-                                                   recvIPBuffer, INET_ADDRSTRLEN);
-                if (convResult == nullptr) {
-                    throw ConversionToIPStringException();
-                }
-                acceptPacket = strcmp(originIP.c_str(), recvIPBuffer) == 0;
+                acceptPacket = reinterpret_cast<sockaddr_in *>(&origin)->sin_addr.s_addr == reinterpret_cast<sockaddr_in *>(&trueOrigin)->sin_addr.s_addr;
 
             } else if (!originIP.empty() && m_ipVersion == AF_INET6) {
 
-                char recvIPBuffer[INET6_ADDRSTRLEN] {};
-                const char *convResult = inet_ntop(m_ipVersion, &(reinterpret_cast<sockaddr_in6*>(&origin)->sin6_addr), recvIPBuffer, INET6_ADDRSTRLEN);
-
-                if (convResult == nullptr) {
-                    throw ConversionToIPStringException();
-                }
-                acceptPacket = strcmp(originIP.c_str(), recvIPBuffer) == 0;
+                acceptPacket = std::equal( std::begin(reinterpret_cast<sockaddr_in6 *>(&origin)->sin6_addr.s6_addr),
+                    std::end(reinterpret_cast<sockaddr_in6 *>(&origin)->sin6_addr.s6_addr),
+                    std::begin(reinterpret_cast<sockaddr_in6 *>(&trueOrigin)->sin6_addr.s6_addr));
             }
             // Anti Tampering and Packet Integrity Checks
             acceptPacket = (originIP.empty() || acceptPacket) && ipHeaderReceive.getProtocol() == IPPROTO_ICMP
@@ -198,6 +199,77 @@ public:
         }
         return numBytesRecv;
     }
+
+
+    Int pingCheck(const std::string& destination, const Int numOfPings) {
+
+        setSocketAsNonBlock();
+
+        auto sendingFunc = [&] {
+            for (int i = 0; i < numOfPings; ++i) {
+                sendPing(destination);
+            }
+        };
+
+        auto receivingFunc = [&] () -> Int {
+            Int numReceived {};
+            Int epollFD = epoll_create1(0);
+            if (epollFD == -1) {
+                throw EpollCreationException();
+            }
+            try {
+                epoll_event ev {};
+                ev.events = EPOLLIN;
+                ev.data.fd = m_socket;
+                Int result = epoll_ctl(epollFD, EPOLL_CTL_ADD, m_socket, &ev);
+                if (result == -1) {
+                    throw EpollControllerException(EPOLL_CTL_ADD);
+                }
+
+                while (true) {
+                    result = epoll_wait(epollFD, &ev, 1,10000);
+                    if (result == -1) {
+                        throw EpollWaitException();
+                    } else if (result == 0) {
+                        //timeout
+                        close(epollFD);
+                        return numReceived;
+                    }
+
+                    if (ev.data.fd == m_socket && ev.events & EPOLLIN) {
+                        std::array<uint8_t, IP_MAXPACKET> recvBuffer {};
+                        int64_t numBytesRecv {};
+                        try {
+                            numBytesRecv = receivePing(recvBuffer.data(), destination);
+                        } catch (std::exception& e) {
+                            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                                continue; //EWOULDBLOCK or EAGAIN, kernel dropped the packet for some reason, such as CRC corruption
+                            } else {
+                                std::cerr << e.what() << '\n';
+                            }
+                        }
+                        if (numBytesRecv > 0) {
+                            numReceived++;
+                        }
+                    }
+                }
+            } catch (std::runtime_error& e) {
+                close(epollFD);
+                std::cerr << e.what() << '\n';
+                return numReceived;
+            }
+        };
+
+
+        std::thread sender(sendingFunc);
+        std::future<Int> receiver(std::async(receivingFunc));
+
+        sender.join();
+        setSocketAsBlock();
+        return receiver.get();
+    }
+
+
 
     static size_t constructARPEchoRequestPacket(uint8_t* packet, const uint32_t& dstIPAddress,
         const uint32_t& srcIPAddress, const std::array<uint8_t,6>& dstMacAddress, const std::array<uint8_t,6>& srcMacAddress) {

@@ -191,3 +191,10 @@ TEST(MethodChecking, sendPingIPv4Only) {
     EXPECT_EQ(senderIP, ipHeaderReceive.getDestStr());
     EXPECT_EQ(destinationIP, ipHeaderReceive.getSourceStr());
 }
+
+
+TEST(MethodChecking, pingCheck2) {
+    RawSocket socket {AF_INET, IPPROTO_ICMP};
+    Int received = socket.pingCheck(Tools::getDefaultGateway(), 5);
+    EXPECT_GT(received, 0);
+}

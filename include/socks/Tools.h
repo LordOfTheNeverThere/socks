@@ -1,7 +1,3 @@
-//
-// Created by miguel on 3/3/26.
-//
-
 #ifndef SOCKS_TOOLS_H
 #define SOCKS_TOOLS_H
 #include <iomanip>
@@ -19,7 +15,6 @@
 #include <sys/epoll.h>
 
 #include "Exceptions.h"
-#include "RawSocket.h"
 #include "types.h"
 
 class Tools {
@@ -220,75 +215,6 @@ class Tools {
         }
         pclose(pipe);
     }
-
-
-    static Int pingCheck(const std::string& destination, const Int numOfPings, const sa_family_t ipVersion = AF_INET) {
-
-        RawSocket socket {ipVersion, IPPROTO_ICMP};
-        socket.setSocketAsNonBlock();
-
-        auto sendingFunc = [&] {
-            for (int i = 0; i < numOfPings; ++i) {
-                socket.sendPing(destination);
-            }
-        };
-
-        auto receivingFunc = [&] () -> Int {
-            Int numReceived {};
-            Int epollFD = epoll_create1(0);
-            if (epollFD == -1) {
-                throw EpollCreationException();
-            }
-            try {
-                epoll_event ev {};
-                ev.events = EPOLLIN;
-                ev.data.fd = socket.m_socket;
-                Int result = epoll_ctl(epollFD, EPOLL_CTL_ADD, socket.m_socket, &ev);
-                if (result == -1) {
-                    throw EpollControllerException(EPOLL_CTL_ADD);
-                }
-
-                while (true) {
-                    result = epoll_wait(epollFD, &ev, 1,10000);
-                    if (result == -1) {
-                        throw EpollWaitException();
-                    } else if (result == 0) {
-                        //timeout
-                        close(epollFD);
-                        return numReceived;
-                    }
-
-                    if (ev.data.fd == socket.m_socket && ev.events & EPOLLIN) {
-                        std::array<uint8_t, IP_MAXPACKET> recvBuffer {};
-                        int64_t numBytesRecv {};
-                        try {
-                            numBytesRecv = socket.receivePing(recvBuffer.data(), destination);
-                        } catch (std::exception& e) {
-                            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                continue; //EWOULDBLOCK or EAGAIN, kernel dropped the packet for some reason, such as CRC corruption
-                            } else {
-                                std::cerr << e.what() << '\n';
-                            }
-                        }
-                        if (numBytesRecv > 0) {
-                            numReceived++;
-                        }
-                    }
-                }
-            } catch (std::runtime_error& e) {
-                close(epollFD);
-                std::cerr << e.what() << '\n';
-                return numReceived;
-            }
-        };
-
-
-        std::thread sender(sendingFunc);
-        std::future<Int> receiver(std::async(receivingFunc));
-
-        return receiver.get();
-    }
-
 };
 
 #endif //SOCKS_TOOLS_H
