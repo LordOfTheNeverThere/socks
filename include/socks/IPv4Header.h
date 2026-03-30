@@ -1,6 +1,3 @@
-//
-// Created by miguel on 3/5/26.
-//
 
 #ifndef SOCKS_IPHEADER_H
 #define SOCKS_IPHEADER_H

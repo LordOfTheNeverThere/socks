@@ -1,6 +1,3 @@
-//
-// Created by miguel on 2/25/26.
-//
 
 #ifndef SOCKS_GENERICEXCEPTION_H
 #define SOCKS_GENERICEXCEPTION_H

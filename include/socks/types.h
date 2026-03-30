@@ -1,6 +1,3 @@
-//
-// Created by miguel on 2/12/26.
-//
 
 #ifndef SOCKS_TYPES_H
 #define SOCKS_TYPES_H

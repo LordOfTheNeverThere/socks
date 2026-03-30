@@ -1,6 +1,4 @@
-//
-// Created by miguel on 3/4/26.
-//
+
 
 #ifndef SOCKS_SOCKET_H
 #define SOCKS_SOCKET_H

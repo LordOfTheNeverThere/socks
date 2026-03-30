@@ -1,6 +1,3 @@
-//
-// Created by miguel on 3/2/26.
-//
 
 #ifndef SOCKS_SCOKET_H
 #define SOCKS_SCOKET_H

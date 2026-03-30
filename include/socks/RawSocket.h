@@ -1,6 +1,3 @@
-//
-// Created by miguel on 3/3/26.
-//
 
 #ifndef SOCKS_RAWSOCKET_H
 #define SOCKS_RAWSOCKET_H
@@ -28,7 +25,7 @@ private:
     Int m_ipVersion {0};
     Int m_protocol {0};
 public:
-    RawSocket(const Int& ipVersion, const Int& protocol) :  m_protocol(protocol) {
+    RawSocket(const Int ipVersion, const Int protocol) :  m_protocol(protocol) {
 
         if (ipVersion != AF_INET && ipVersion != AF_INET6 && ipVersion != AF_PACKET) {
             throw UnsupportedAFTypeException(ipVersion);
@@ -42,24 +39,7 @@ public:
         }
     }
 
-    // void setIPHeader(IPv4Header& ipHeader) {
-    //     if (ipHeader.header != nullptr) {
-    //         ipHeader.setProtocol(IPPROTO_ICMP);
-    //         m_ipHeader = ipHeader;
-    //         Int one = 1;
-    //         Int socketOpt = setsockopt(m_socket,IPPROTO_IP,IP_HDRINCL, &one, sizeof(one));
-    //         m_ipVersion = AF_INET;
-    //         if (socketOpt == -1) {
-    //             throw SocketOptionException(IP_HDRINCL);
-    //         }
-    //     }
-    // }
-
-    // [[nodiscard]] bool autogenerateIPHeader() const {
-    //     return m_ipHeader.header == nullptr;
-    // }
-
-    size_t constructICMPPacketWithIPHeader(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const uint16_t& seqNum, const uint16_t& processIDNum, IPv4Header ipHeader)  {
+    size_t constructICMPPacketWithIPHeader(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const uint16_t seqNum, const uint16_t processIDNum, IPv4Header ipHeader)  {
 
         ipHeader.setProtocol(IPPROTO_ICMP);
         size_t ipHeaderSize {ipHeader.getHeaderLenghtInBytes()};
@@ -70,7 +50,7 @@ public:
         return ipHeaderSize + constructICMPPacket(packet + ipHeaderSize, headerSize, nanosecsSize, seqNum, processIDNum);
     }
 
-    static size_t constructICMPPacket(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const uint16_t& seqNum, const uint16_t& processIDNum) {
+    static size_t constructICMPPacket(uint8_t* packet, const size_t headerSize, const size_t nanosecsSize, const uint16_t seqNum, const uint16_t processIDNum) {
         std::memset(packet, 0, headerSize + nanosecsSize);
         icmp icmpHeader {};
         // Build ICMP Header
@@ -91,7 +71,7 @@ public:
         return headerSize + nanosecsSize;
     }
 
-    size_t sendPingIPv4Only(const uint32_t ipNum, const uint16_t& seqNum = 0, const uint16_t& processIDNum = 0, IPv4Header ipHeader = IPv4Header()) {
+    size_t sendPingIPv4Only(const uint32_t ipNum, const uint16_t seqNum = 0, const uint16_t processIDNum = 0, IPv4Header ipHeader = IPv4Header()) {
         sockaddr_storage destination {};
         sockaddr_in *ipv4View = reinterpret_cast<sockaddr_in *>(&destination);
         ipv4View->sin_addr.s_addr = ipNum;
@@ -100,7 +80,7 @@ public:
         return sendPing(destination, seqNum, processIDNum, ipHeader);
     }
 
-    size_t sendPing(sockaddr_storage& destination, const uint16_t& seqNum = 0, const uint16_t& processIDNum = 0, IPv4Header ipHeader = IPv4Header()) {
+    size_t sendPing(sockaddr_storage& destination, const uint16_t seqNum = 0, const uint16_t processIDNum = 0, IPv4Header ipHeader = IPv4Header()) {
 
         const size_t headerSize = sizeof(icmphdr); //use icmphdr instead of icmp for requests, icmp has part of the IP header which caused the host to reply with an error, since this is request it is nonsensical to include it here
         const size_t nanosecsSize = sizeof(uint64_t);
@@ -133,7 +113,7 @@ public:
         return sent;
     }
 
-    size_t sendPing(const std::string& destIP, const uint16_t& seqNum = 0, const uint16_t& processIDNum = 0,  IPv4Header ipHeader = IPv4Header()){
+    size_t sendPing(const std::string& destIP, const uint16_t seqNum = 0, const uint16_t processIDNum = 0,  IPv4Header ipHeader = IPv4Header()){
         
         sockaddr_storage destination {};
         destination.ss_family = m_ipVersion;
@@ -151,7 +131,7 @@ public:
        return sendPing(destination, seqNum, processIDNum, ipHeader);
     }
 
-    int64_t receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "", const Int& seqNum = 0,  const Int& processIDNum = 0) const {
+    int64_t receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "", const Int seqNum = 0,  const Int processIDNum = 0) const {
         sockaddr_storage origin {};
         socklen_t originAddrLen = sizeof(origin);
 
@@ -272,8 +252,8 @@ public:
 
 
 
-    static size_t constructARPEchoRequestPacket(uint8_t* packet, const uint32_t& dstIPAddress,
-        const uint32_t& srcIPAddress, const std::array<uint8_t,6>& dstMacAddress, const std::array<uint8_t,6>& srcMacAddress) {
+    static size_t constructARPEchoRequestPacket(uint8_t* packet, const uint32_t dstIPAddress,
+        const uint32_t srcIPAddress, const std::array<uint8_t,6>& dstMacAddress, const std::array<uint8_t,6>& srcMacAddress) {
 
         ether_header ethernetHeader {};
         std::memcpy(ethernetHeader.ether_dhost, dstMacAddress.data(), 6);

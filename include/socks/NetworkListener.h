@@ -1,6 +1,3 @@
-//
-// Created by miguel on 2/13/26.
-//
 
 #ifndef SOCKS_ADDRESSINFO_H
 #define SOCKS_ADDRESSINFO_H

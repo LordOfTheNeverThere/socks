@@ -1,6 +1,3 @@
-//
-// Created by miguel on 3/13/26.
-//
 
 #ifndef SOCKS_LOCALHOST_H
 #define SOCKS_LOCALHOST_H
