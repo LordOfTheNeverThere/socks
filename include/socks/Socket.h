@@ -78,6 +78,14 @@ public:
         }
     }
 
+    void setSocketIPHeaderManually(const Int val) {
+
+        Int socketOpt = setsockopt(m_socket,IPPROTO_IP,IP_HDRINCL, &val, sizeof(val));
+        if (socketOpt == -1) {
+            throw SocketOptionException(IP_HDRINCL);
+        }
+    }
+
     uint64_t getSocketSndBuffer() const {
         uint64_t bufferSize{};
         socklen_t bufferVarSize{sizeof(bufferSize)};

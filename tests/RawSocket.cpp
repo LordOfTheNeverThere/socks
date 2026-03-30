@@ -65,8 +65,7 @@ TEST(MethodChecking, sendPingReceivePingWithIPHeader) {
     RawSocket socket {AF_INET, IPPROTO_ICMP};
     uint8_t ipHeaderSendBuffer[sizeof(ip)] {};
     IPv4Header ipHeaderSend {IPv4Header(ipHeaderSendBuffer, senderIP.c_str(), destinationIP.c_str(),0, 0)}; // these values will be filled when sending the ping
-    socket.setIPHeader(ipHeaderSend);
-    socket.sendPing(destinationIP, 1, 2);
+    socket.sendPing(destinationIP, 1, 2, ipHeaderSend);
 
     uint8_t packet[IP_MAXPACKET] {};
     socket.receivePing(packet, destinationIP, 1 , 2);
