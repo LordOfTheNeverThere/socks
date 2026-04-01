@@ -75,6 +75,11 @@ public:
             }
         }
     }
+    void setSocketOpt(const Int level ,const Int opt, const Int optVal) {
+        if (setsockopt(m_socket, level, opt, &optVal, sizeof(optVal)) == -1) {
+            throw  FileDescriptorOptionException(O_NONBLOCK);
+        }
+    }
 
     void setSocketIPHeaderManually(const Int val) {
 

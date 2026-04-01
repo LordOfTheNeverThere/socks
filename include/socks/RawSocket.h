@@ -25,6 +25,7 @@ private:
     Int m_ipVersion {0};
     Int m_protocol {0};
 public:
+    RawSocket(){};
     RawSocket(const Int ipVersion, const Int protocol) :  m_protocol(protocol) {
 
         if (ipVersion != AF_INET && ipVersion != AF_INET6 && ipVersion != AF_PACKET) {
@@ -131,7 +132,7 @@ public:
        return sendPing(destination, seqNum, processIDNum, ipHeader);
     }
 
-    int64_t receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "", const Int seqNum = 0,  const Int processIDNum = 0) const {
+    int64_t receivePing(uint8_t packet[IP_MAXPACKET], const std::string& originIP = "", const Int seqNum = 0,  const Int processIDNum = 0, const Int icmpType = ICMP_ECHOREPLY) const {
         sockaddr_storage origin {};
         socklen_t originAddrLen = sizeof(origin);
 
@@ -176,7 +177,7 @@ public:
             acceptPacket = (originIP.empty() || acceptPacket) && ipHeaderReceive.getProtocol() == IPPROTO_ICMP
             && (seqNum == 0 || seqNum == ntohs(ICMPHeaderReceive.un.echo.sequence))
             && (processIDNum == 0  || processIDNum == ntohs(ICMPHeaderReceive.un.echo.id))
-            && ICMPHeaderReceive.type == ICMP_ECHOREPLY;
+            && (ICMPHeaderReceive.type == ICMP_ECHOREPLY || ICMPHeaderReceive.type == icmpType); // We always catch at least Echo replies, however other types can also be caught
         }
         return numBytesRecv;
     }
