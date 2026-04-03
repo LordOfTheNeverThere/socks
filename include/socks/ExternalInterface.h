@@ -13,6 +13,7 @@
 #include "IPv4Header.h"
 #include "IPv4ToMACARPPacket.h"
 #include "Tools.h"
+#include "socks/cmakeVars.h"
 
 
 class ExternalInterface{
@@ -39,7 +40,8 @@ private:
     }
 
     void populateNameFromVendor() {
-        std::ifstream ouiFile("resources/oui.txt");
+        std::string resourcesPath {SOCKS_RESOURCES};
+        std::ifstream ouiFile( resourcesPath + "/oui.txt");
         std::string lineBuffer {};
         std::string name {};
         std::string oui {};
