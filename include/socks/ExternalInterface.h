@@ -105,6 +105,10 @@ public:
         return m_timelapse;
     }
 
+    double getTimelapseInMillis() const {   // In Milliseconds
+        return static_cast<double>(m_timelapse)/1000000;
+    }
+
     void setIPVersion(const sa_family_t& ipVersion) {
         m_ipVersion = ipVersion;
     }
@@ -227,7 +231,7 @@ inline std::ostream& operator<<(std::ostream& os, const ExternalInterface& host)
     if (!host.getMacAddress().empty()) { // Local
         os << "MAC-Vendor: " << host.getMacVendor() << '\n' << "MAC: " << host.getMacAddress() << '\n';
     } else { // Non-Local
-        os << "Ping Timelapse (ns): " << host.getTimelapse() << '\n';
+        os << "Ping Timelapse (ms): " << host.getTimelapseInMillis() << '\n';
     }
     os << "IP Address: " << host.getIPAddress() <<  '\n';
     return os;

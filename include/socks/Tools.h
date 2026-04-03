@@ -215,6 +215,12 @@ class Tools {
         }
         pclose(pipe);
     }
+
+    static bool isValidIPv4(const std::string& ip) {
+        sockaddr_in sa;
+        int result = inet_pton(AF_INET, ip.c_str(), &(sa.sin_addr));
+        return result != 0;
+    }
 };
 
 #endif //SOCKS_TOOLS_H
