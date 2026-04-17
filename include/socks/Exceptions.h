@@ -50,6 +50,9 @@ public:
     ConnectionFailedException(const std::string& ipString, const Int port)
     : SystemCallException( "The connection of the socket to IP and port: " + ipString + ":" + std::to_string(port) + " on the server failed. \n Reason: \n" + std::system_category().message(errno)) {}
 
+    ConnectionFailedException(const std::string& ipString, const std::string& port)
+    : SystemCallException( "The connection of the socket to IP and port: " + ipString + ":" + port + " on the server failed. \n Reason: \n" + std::system_category().message(errno)) {}
+
     ConnectionFailedException()
     : SystemCallException("It was not possible to connect the socket to any of the interfaces, one of the reasons: \n" + std::system_category().message(errno)) {}
 };
