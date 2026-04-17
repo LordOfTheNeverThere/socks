@@ -77,7 +77,7 @@ public:
     }
     void setSocketOpt(const Int level ,const Int opt, const Int optVal) {
         if (setsockopt(m_socket, level, opt, &optVal, sizeof(optVal)) == -1) {
-            throw  FileDescriptorOptionException(O_NONBLOCK);
+            throw  FileDescriptorOptionException(opt);
         }
     }
 
@@ -109,6 +109,12 @@ public:
         socklen_t dropsVarSize{sizeof(drops)};
         getsockopt(m_socket, SOL_SOCKET, SO_RXQ_OVFL, &drops, &dropsVarSize);
         return drops;
+    }
+
+    void setSocketSendTimeoutValue(const timeval& timeout) const {
+        if (setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) == -1) {
+            throw  FileDescriptorOptionException(SO_SNDTIMEO);
+        }
     }
 
 
