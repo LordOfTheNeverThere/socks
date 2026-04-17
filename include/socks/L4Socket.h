@@ -6,7 +6,7 @@
 #include "Socket.h"
 #include "types.h"
 
-class  L4Socket : private Socket {
+class  L4Socket : public Socket {
 private:
 
     FRIEND_TEST(MethodChecking, createSocketAndBind);
