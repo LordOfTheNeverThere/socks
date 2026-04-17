@@ -121,16 +121,20 @@ private:
 
 
 public:
-    L4Socket (NetworkListener& listener, const bool isServer) {
+    L4Socket (NetworkListener& listener, const bool isServer, const bool socketIsBlocking = true) {
 
         for (AddressInfo &interface: listener.m_interfaces) {
 
             m_socket = socket(interface.family, interface.socketType, interface.protocol);
-
             if (m_socket == -1) {
                 perror("Got an error while creating a socket");
                 continue;
             }
+
+            if (!socketIsBlocking) {
+                setSocketAsNonBlock();
+            }
+
 
             if (isServer) {
                 if (bindSocketToInterface(interface)) {
