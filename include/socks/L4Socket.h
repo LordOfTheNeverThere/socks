@@ -121,7 +121,7 @@ private:
 
 
 public:
-    L4Socket (NetworkListener& listener, const bool isServer, const bool socketIsBlocking = true, const Int tcpConnectTimeout = 0) {
+    L4Socket (NetworkListener& listener, const bool isServer, const bool socketIsBlocking = true, const Int tcpConnectTimeoutMicros = 0) {
 
         for (AddressInfo &interface: listener.m_interfaces) {
 
@@ -142,9 +142,9 @@ public:
                 };
             }
             else {
-                if (interface.socketType == SOCK_STREAM && tcpConnectTimeout != 0) {
+                if (interface.socketType == SOCK_STREAM && tcpConnectTimeoutMicros != 0) {
                     timeval timeout {};
-                    timeout.tv_usec = tcpConnectTimeout * 1000000; // From millis to nanos
+                    timeout.tv_usec = tcpConnectTimeoutMicros;
                     setSocketSendTimeoutValue(timeout);
                 }
                 if (connectSocketToInterface(interface)) {
