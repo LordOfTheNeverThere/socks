@@ -18,18 +18,12 @@ private:
         Int yes = 1;
 
         Int setSocketOption = setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, &yes,sizeof(Int));
-
+        // Allows usage of ports and addresses in less than 2 mins after their closure.
 
         if ( setSocketOption == -1) {
             exit(1);
         }
 
-        // setSocketOption = setsockopt(m_socket, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(Int));
-        //
-        // if ( setSocketOption == -1) {
-        //     exit(1);
-        // }
-        // Allows usage of ports and addresses in less than 2 mins after their closure.
 
         Int binding = bind(m_socket, reinterpret_cast<sockaddr*>(&interface.addr), interface.ipLength);
         if (binding == -1) {
@@ -157,13 +151,16 @@ public:
         }
     }
 
-
-    void send(const void* msgToSend, const size_t msgSize, const Int connectionQueueNumber = 7, const bool multiConnection = true, const Int durationSeconds = -1) {
+    void makeSocketListen(const Int connectionQueueNumber = 7) {
         Int listening = listen(m_socket, connectionQueueNumber);
         if (listening == -1) {
             throw ServerListeningException();
         }
+    }
 
+
+    void send(const void* msgToSend, const size_t msgSize, const Int connectionQueueNumber = 7, const bool multiConnection = true, const Int durationSeconds = -1) {
+        makeSocketListen(connectionQueueNumber);
         sockaddr_storage clientAddress {};
         socklen_t sizeClientAddress = sizeof(clientAddress);
 
