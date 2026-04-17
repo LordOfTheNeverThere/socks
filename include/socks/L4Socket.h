@@ -121,7 +121,7 @@ private:
 
 
 public:
-    L4Socket (NetworkListener& listener, const bool isServer, const bool socketIsBlocking = true, const Int tcpConnectTimeoutMicros = 0) {
+    L4Socket (NetworkListener& listener, const bool isServer, const bool socketIsBlocking = true, const Int tcpConnectTimeoutSecs = 0) {
 
         for (AddressInfo &interface: listener.m_interfaces) {
 
@@ -142,9 +142,9 @@ public:
                 };
             }
             else {
-                if (interface.socketType == SOCK_STREAM && tcpConnectTimeoutMicros != 0) {
+                if (interface.socketType == SOCK_STREAM && tcpConnectTimeoutSecs != 0) {
                     timeval timeout {};
-                    timeout.tv_usec = tcpConnectTimeoutMicros;
+                    timeout.tv_sec = tcpConnectTimeoutSecs;
                     setSocketSendTimeoutValue(timeout);
                 }
                 if (connectSocketToInterface(interface)) {
