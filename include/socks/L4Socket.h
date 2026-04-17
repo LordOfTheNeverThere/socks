@@ -41,6 +41,7 @@ private:
         if (connecting == -1) {
             closeSocket();
             continues = true;
+            if (errno == EINPROGRESS) errno = ETIMEDOUT; // When the timeout option has been tweaked at the socket level, and happens the errno stays in EINPROGRESS, this fixes it
         }
         return continues;
     }
