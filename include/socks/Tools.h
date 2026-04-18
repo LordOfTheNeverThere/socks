@@ -217,8 +217,14 @@ class Tools {
     }
 
     static bool isValidIPv4(const std::string& ip) {
-        sockaddr_in sa;
+        sockaddr_in sa {};
         int result = inet_pton(AF_INET, ip.c_str(), &(sa.sin_addr));
+        return result != 0;
+    }
+
+    static bool isValidIPv6(const std::string& ip) {
+        sockaddr_in6 sa {};
+        int result = inet_pton(AF_INET, ip.c_str(), &(sa.sin6_addr));
         return result != 0;
     }
 };
