@@ -77,16 +77,18 @@ private:
             }
             Int connectedSocket = accept(m_socket, reinterpret_cast<sockaddr*>(&clientAddress), &sizeClientAddress);
             if (connectedSocket == -1) {
-                std::string ipNameBuffer {""};
+                std::string externalIPString {};
                 std::cerr << "It was not possible to accept the connection to the socket from: " ;
                 if (reinterpret_cast<sockaddr*>(&clientAddress)->sa_family == AF_INET) {
-                    ipNameBuffer.resize(INET_ADDRSTRLEN, '\0');
-                    inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in));
+                    char ipBuffer[INET_ADDRSTRLEN] {};
+                    inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipBuffer, sizeof(struct sockaddr_in));
+                    if (errno == 0) externalIPString = std::string(ipBuffer);
                 } else {
-                    ipNameBuffer.resize(INET6_ADDRSTRLEN, '\0');
-                    inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in6));
+                    char ipBuffer[INET6_ADDRSTRLEN] {};
+                    inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipBuffer, sizeof(struct sockaddr_in6));
+                    if (errno == 0) externalIPString = std::string(ipBuffer);
                 }
-                std::cerr << ipNameBuffer.data();
+                std::cerr << externalIPString;
                 continue;
             }
             if (!fork()) { // this is the child process
@@ -182,15 +184,17 @@ public:
         } else {
             Int connectedSocket = accept(m_socket, reinterpret_cast<sockaddr*>(&clientAddress), &sizeClientAddress);
             if (connectedSocket == -1) {
-                std::string ipNameBuffer {""};
+                std::string externalIPString {};
                 if (reinterpret_cast<sockaddr*>(&clientAddress)->sa_family == AF_INET) {
-                    ipNameBuffer.resize(INET_ADDRSTRLEN, '\0');
-                    inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in));
+                    char ipBuffer[INET_ADDRSTRLEN] {};
+                    inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipBuffer, sizeof(struct sockaddr_in));
+                    if (errno == 0) externalIPString = std::string(ipBuffer);
                 } else {
-                    ipNameBuffer.resize(INET6_ADDRSTRLEN, '\0');
-                    inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in6));
+                    char ipBuffer[INET6_ADDRSTRLEN] {};
+                    inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipBuffer, sizeof(struct sockaddr_in6));
+                    if (errno == 0) externalIPString = std::string(ipBuffer);
                 }
-                throw ServerAcceptingException(ipNameBuffer);
+                throw ServerAcceptingException(externalIPString);
             }
             if (::send(connectedSocket, msgToSend, msgSize, 0) == -1) {
                 throw SendingException();
