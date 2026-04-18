@@ -227,6 +227,19 @@ class Tools {
         int result = inet_pton(AF_INET, ip.c_str(), &(sa.sin6_addr));
         return result != 0;
     }
+    static std::string getIPAddrressFromConnection(sockaddr_storage clientAddress) {
+        std::string externalIPString {};
+        if (reinterpret_cast<sockaddr*>(&clientAddress)->sa_family == AF_INET) {
+            char ipBuffer[INET_ADDRSTRLEN] {};
+            inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipBuffer, sizeof(struct sockaddr_in));
+            if (errno == 0) externalIPString = std::string(ipBuffer);
+        } else {
+            char ipBuffer[INET6_ADDRSTRLEN] {};
+            inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipBuffer, sizeof(struct sockaddr_in6));
+            if (errno == 0) externalIPString = std::string(ipBuffer);
+        }
+        return externalIPString;
+    }
 };
 
 #endif //SOCKS_TOOLS_H

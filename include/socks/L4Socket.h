@@ -115,17 +115,8 @@ private:
 
 
 
-    void closeSocket() {
-        if (m_socket != -1) {
-            close(m_socket);
-            m_socket = -1; // Prevent double-close or closing wrong FDs
-        }
-    }
-
-
-
 public:
-    L4Socket (NetworkListener& listener, const bool isServer, const bool socketIsBlocking = true, const Int tcpConnectTimeoutSecs = 0) {
+    L4Socket (NetworkListener& listener, const bool isServer, const bool socketIsBlocking = true, const Int tcpConnectTimeoutSecs = 0){
 
         for (AddressInfo &interface: listener.m_interfaces) {
 

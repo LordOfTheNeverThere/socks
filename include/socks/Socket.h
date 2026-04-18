@@ -7,12 +7,15 @@
 #include <sys/ioctl.h>
 #include <linux/sockios.h>
 #include <unistd.h>
+#include <utility>
 
 #include "Exceptions.h"
 
 class  Socket {
 public:
     Int m_socket {-1};
+    Socket(Int newSocket): m_socket(newSocket){};
+    Socket(){};
 
     void setSocketAsNonBlock() const {
         Int result {fcntl(m_socket, F_SETFL, O_NONBLOCK)};
@@ -118,8 +121,35 @@ public:
     }
 
 
+    void closeSocket() {
+        if (m_socket != -1) {
+            close(m_socket);
+            m_socket = -1; // Prevent double-close or closing wrong FDs
+        }
+    }
+
+    // copy constructor deleted
+    Socket(const Socket& other) = delete;
+
+    // copy assignment operator deleted
+    Socket& operator=(const Socket& other) = delete;
+
+    // move constructor
+    Socket(Socket&& other) noexcept
+        : m_socket(std::exchange(other.m_socket, -1)) {
+    }
+
+    //  move assignment operator
+    Socket& operator=(Socket&& other) noexcept {
+        if (this != &other) {
+            closeSocket(); // Clean up our current resource first
+            // Transfer ownership and reset the source
+            m_socket = std::exchange(other.m_socket, -1);
+        }
+        return *this;
+    }
     ~Socket() {
-        close(m_socket);
+        closeSocket();
     }
 };
 
