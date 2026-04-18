@@ -80,8 +80,10 @@ private:
                 std::string ipNameBuffer {""};
                 std::cerr << "It was not possible to accept the connection to the socket from: " ;
                 if (reinterpret_cast<sockaddr*>(&clientAddress)->sa_family == AF_INET) {
+                    ipNameBuffer.resize(INET_ADDRSTRLEN, '\0');
                     inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in));
                 } else {
+                    ipNameBuffer.resize(INET6_ADDRSTRLEN, '\0');
                     inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in6));
                 }
                 std::cerr << ipNameBuffer.data();
@@ -182,8 +184,10 @@ public:
             if (connectedSocket == -1) {
                 std::string ipNameBuffer {""};
                 if (reinterpret_cast<sockaddr*>(&clientAddress)->sa_family == AF_INET) {
+                    ipNameBuffer.resize(INET_ADDRSTRLEN, '\0');
                     inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(&clientAddress)->sin_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in));
                 } else {
+                    ipNameBuffer.resize(INET6_ADDRSTRLEN, '\0');
                     inet_ntop(AF_INET6, &reinterpret_cast<sockaddr_in6*>(&clientAddress)->sin6_addr, ipNameBuffer.data(), sizeof(struct sockaddr_in6));
                 }
                 throw ServerAcceptingException(ipNameBuffer);
